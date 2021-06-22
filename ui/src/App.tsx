@@ -14,6 +14,7 @@ import ReactMapGL, {
 import 'maplibre-gl/dist/maplibre-gl.css';
 // 3rd-party easing functions
 import { easeCubic } from 'd3-ease';
+import { ViewState } from 'react-map-gl/src/mapbox/mapbox';
 
 Amplify.configure(amplifyConfig);
 
@@ -33,10 +34,8 @@ const App = () => {
   const [viewport, setViewport] = React.useState<Partial<ViewportProps>>({
     longitude: -77.0369,
     latitude: 38.9072,
-    zoom: 14,
+    zoom: 12,
   });
-
-  const [userLocation, setUserLocation] = useState<GeolocationCoordinates>();
 
   useEffect(() => {
     const fetchCredentials = async () => {
@@ -64,14 +63,14 @@ const App = () => {
     makeRequestTransformer();
   }, [credentials]);
 
-  const goToNYC = () => {
+  const goToDC = () => {
     setViewport({
       ...viewport,
-      longitude: -74.1,
-      latitude: 40.7,
+      longitude: -77.0369,
+      latitude: 38.9072,
       zoom: 14,
-      bearing: 90,
-      transitionDuration: 1000,
+      bearing: 0,
+      transitionDuration: 5000,
       transitionInterpolator: flyToInterpolator,
       transitionEasing: easeCubic,
     });
@@ -79,6 +78,11 @@ const App = () => {
 
   return (
     <div>
+      <div className="goto-user">
+        <button className="goto-user-btn" onClick={goToDC}>
+          Washington, DC
+        </button>
+      </div>
       {transformRequest ? (
         <ReactMapGL
           {...viewport}
@@ -94,20 +98,13 @@ const App = () => {
               style={geolocateStyle}
               positionOptions={positionOptions}
               showAccuracyCircle={false}
-              trackUserLocation
+              trackUserLocation={true}
               auto
-              onGeolocate={({ coords }: GeolocationPosition) => {
-                const heading = coords.heading || Math.random() * 360;
-                const { latitude, longitude } = coords;
-
-                console.log(viewport);
-
+              onViewportChange={(viewstate: ViewState) => {
+                console.log(viewstate);
                 setViewport({
-                  ...viewport,
-                  latitude,
-                  longitude,
-                  bearing: heading,
-                  zoom: 17,
+                  ...viewstate,
+                  bearing: Math.random() * 360,
                   transitionDuration: 1000,
                   transitionInterpolator: flyToInterpolator,
                   transitionEasing: easeCubic,
@@ -119,7 +116,6 @@ const App = () => {
       ) : (
         <h1>Loading...</h1>
       )}
-      <button onClick={goToNYC}>New York City</button>
     </div>
   );
 };
