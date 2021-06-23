@@ -83,6 +83,19 @@ const App = () => {
           Washington, DC
         </button>
       </div>
+      <div className="radar-container">
+        <svg className="radar" height="20" width="20" viewBox="0 0 20 20">
+          <circle
+            r="5"
+            cx="50%"
+            cy="50%"
+            fill="transparent"
+            stroke="rgba(235, 29, 29, 0.66)"
+            stroke-width="10"
+            stroke-dasharray="3.925 27.475"
+          />
+        </svg>
+      </div>
       {transformRequest ? (
         <ReactMapGL
           {...viewport}
@@ -98,7 +111,7 @@ const App = () => {
               style={geolocateStyle}
               positionOptions={positionOptions}
               showAccuracyCircle={false}
-              trackUserLocation={true}
+              trackUserLocation={false}
               auto
               onViewportChange={(viewstate: ViewState) => {
                 console.log(viewstate);
