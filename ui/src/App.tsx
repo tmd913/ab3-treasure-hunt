@@ -15,6 +15,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 // 3rd-party easing functions
 import { easeCubic } from 'd3-ease';
 import { ViewState } from 'react-map-gl/src/mapbox/mapbox';
+import ReactDOM from 'react-dom';
 
 Amplify.configure(amplifyConfig);
 
@@ -31,11 +32,15 @@ const App = () => {
   const [credentials, setCredentials] = useState<ICredentials>();
   const [transformRequest, setRequestTransformer] = useState<Function>();
 
-  const [viewport, setViewport] = React.useState<Partial<ViewportProps>>({
+  const [viewport, setViewport] = useState<Partial<ViewportProps>>({
     longitude: -77.0369,
     latitude: 38.9072,
     zoom: 12,
   });
+
+  const [rotation, setRotation] = useState<number>(0);
+  const [dot, setDot] = useState<Element>();
+  const [counter, setCounter] = useState<number>(0);
 
   useEffect(() => {
     const fetchCredentials = async () => {
@@ -63,6 +68,33 @@ const App = () => {
     makeRequestTransformer();
   }, [credentials]);
 
+  useEffect(() => {
+    if (dot) {
+      const div = (
+        <div className="radar-container">
+          <svg
+            className="radar"
+            height="20"
+            width="20"
+            viewBox="0 0 20 20"
+            transform={`rotate(${rotation})`}
+          >
+            <circle
+              r="5"
+              cx="50%"
+              cy="50%"
+              fill="transparent"
+              stroke="rgba(235, 29, 29, 0.66)"
+              strokeWidth="10"
+              strokeDasharray="3.925 27.475"
+            />
+          </svg>
+        </div>
+      );
+      ReactDOM.render(div, dot);
+    }
+  }, [dot, rotation]);
+
   const goToDC = () => {
     setViewport({
       ...viewport,
@@ -83,19 +115,6 @@ const App = () => {
           Washington, DC
         </button>
       </div>
-      <div className="radar-container">
-        <svg className="radar" height="20" width="20" viewBox="0 0 20 20">
-          <circle
-            r="5"
-            cx="50%"
-            cy="50%"
-            fill="transparent"
-            stroke="rgba(235, 29, 29, 0.66)"
-            stroke-width="10"
-            stroke-dasharray="3.925 27.475"
-          />
-        </svg>
-      </div>
       {transformRequest ? (
         <ReactMapGL
           {...viewport}
@@ -103,7 +122,13 @@ const App = () => {
           height="100vh"
           transformRequest={transformRequest}
           mapStyle={mapName}
-          onViewportChange={setViewport}
+          onViewportChange={(viewstate: ViewState) => {
+            setViewport(viewstate);
+            setCounter(counter + 1);
+            if (counter % 10 === 0) {
+              setRotation(rotation + 10);
+            }
+          }}
         >
           <div style={{ position: 'absolute', left: 20, top: 20 }}>
             <NavigationControl showCompass={true} />
@@ -114,7 +139,16 @@ const App = () => {
               trackUserLocation={false}
               auto
               onViewportChange={(viewstate: ViewState) => {
-                console.log(viewstate);
+                if (!dot) {
+                  const dotEl = document.querySelector(
+                    '.mapboxgl-user-location-dot.mapboxgl-marker.mapboxgl-marker-anchor-center'
+                  );
+                  if (dotEl) {
+                    dotEl.setAttribute('style', 'text-content: center');
+                    setDot(dotEl);
+                  }
+                }
+
                 setViewport({
                   ...viewstate,
                   bearing: Math.random() * 360,
