@@ -1,10 +1,11 @@
 import React from 'react';
 import './App.css';
-import Amplify, { Auth } from 'aws-amplify';
+import Amplify, { Auth, Hub } from 'aws-amplify';
 import amplifyConfig from './amplify-config';
 import { useEffect, useState } from 'react';
 import { createRequestTransformer } from 'amazon-location-helpers';
 import { ICredentials } from '@aws-amplify/core';
+import { CognitoUser } from '@aws-amplify/auth';
 import ReactMapGL, {
   NavigationControl,
   ViewportProps,
@@ -48,25 +49,45 @@ const App = () => {
     };
 
     fetchCredentials();
+    console.log(credentials);
+  }, []);
+
+  useEffect(() => {
+    Hub.listen('auth', async ({ payload: { event, data } }) => {
+      switch (event) {
+        case 'cognitoHostedUI':
+          let user: CognitoUser = await Auth.currentAuthenticatedUser();
+          console.log(user.getSignInUserSession()?.getIdToken());
+          console.log(
+            user.getSignInUserSession()?.getIdToken()?.decodePayload()
+          );
+          break;
+        case 'cognitoHostedUI_failure':
+          console.error(data);
+          break;
+        default:
+          break;
+      }
+    });
   }, []);
 
   // create a new transformRequest function whenever the credentials change
-  useEffect(() => {
-    const makeRequestTransformer = async () => {
-      if (credentials) {
-        const tr = await createRequestTransformer({
-          credentials,
-          identityPoolId: amplifyConfig.Auth.identityPoolId,
-          region: amplifyConfig.Auth.region,
-        });
-        // wrap the new value in an anonymous function to prevent React from recognizing it as a
-        // function and immediately calling it
-        setRequestTransformer(() => tr);
-      }
-    };
+  // useEffect(() => {
+  //   const makeRequestTransformer = async () => {
+  //     if (credentials) {
+  //       const tr = await createRequestTransformer({
+  //         credentials,
+  //         identityPoolId: amplifyConfig.Auth.identityPoolId,
+  //         region: amplifyConfig.Auth.region,
+  //       });
+  //       // wrap the new value in an anonymous function to prevent React from recognizing it as a
+  //       // function and immediately calling it
+  //       setRequestTransformer(() => tr);
+  //     }
+  //   };
 
-    makeRequestTransformer();
-  }, [credentials]);
+  //   makeRequestTransformer();
+  // }, [credentials]);
 
   useEffect(() => {
     if (dot) {
@@ -110,7 +131,9 @@ const App = () => {
 
   return (
     <div>
-      <div className="goto-user">
+      <button onClick={() => Auth.federatedSignIn()}>Sign In / Sign Up</button>
+      <button onClick={() => Auth.signOut()}>Sign Out</button>
+      {/* <div className="goto-user">
         <button className="goto-user-btn" onClick={goToDC}>
           Washington, DC
         </button>
@@ -162,7 +185,7 @@ const App = () => {
         </ReactMapGL>
       ) : (
         <h1>Loading...</h1>
-      )}
+      )} */}
     </div>
   );
 };

@@ -6,11 +6,84 @@ import * as s3 from '@aws-cdk/aws-s3';
 import * as s3Deployment from '@aws-cdk/aws-s3-deployment';
 import * as cloudfront from '@aws-cdk/aws-cloudfront';
 import * as iam from '@aws-cdk/aws-iam';
+import * as cognito from '@aws-cdk/aws-cognito';
 import { Duration } from '@aws-cdk/core';
+import { OAuthScope, UserPoolClient } from '@aws-cdk/aws-cognito';
 
 export class Ab3TreasureHuntStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    // ============================================================
+    // Cognito User Pool
+    // ============================================================
+
+    const userPool = new cognito.UserPool(this, id + 'Pool', {
+      signInAliases: {
+        email: true,
+      },
+      autoVerify: {
+        email: true,
+      },
+      passwordPolicy: {
+        tempPasswordValidity: Duration.days(7),
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: true,
+      },
+      signInCaseSensitive: false,
+      selfSignUpEnabled: true,
+    });
+
+    new cognito.CfnUserPoolGroup(this, 'PlayersGroup', {
+      groupName: 'Players',
+      userPoolId: userPool.userPoolId,
+    });
+
+    new cognito.CfnUserPoolGroup(this, 'AdminsGroup', {
+      groupName: 'Admins',
+      userPoolId: userPool.userPoolId,
+    });
+
+    const userPoolClient = new cognito.UserPoolClient(this, id + 'PoolClient', {
+      userPool,
+      supportedIdentityProviders: [
+        cognito.UserPoolClientIdentityProvider.COGNITO,
+      ],
+      userPoolClientName: 'Web',
+      authFlows: {
+        userSrp: true,
+      },
+      oAuth: {
+        flows: {
+          authorizationCodeGrant: true,
+        },
+        scopes: [OAuthScope.EMAIL, OAuthScope.OPENID, OAuthScope.PROFILE],
+        callbackUrls: ['http://localhost:3000'],
+        logoutUrls: ['http://localhost:3000'],
+      },
+      generateSecret: false,
+      refreshTokenValidity: Duration.days(30),
+      accessTokenValidity: Duration.hours(1),
+      idTokenValidity: Duration.hours(1),
+    });
+
+    const userPoolDomain = new cognito.UserPoolDomain(
+      this,
+      id + 'UserPoolDomain',
+      {
+        cognitoDomain: {
+          domainPrefix: 'ab3-treasure-hunt',
+        },
+        userPool,
+      }
+    );
+
+    // ============================================================
+    // API Lambdas
+    // ============================================================
 
     const apiDefaultHandler = new lambda.Function(this, 'apiDefaultHandler', {
       runtime: lambda.Runtime.NODEJS_14_X,
@@ -19,25 +92,54 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       memorySize: 512,
     });
 
-    const apiHelloHandler = new lambda.Function(this, 'apiHelloHandler', {
+    const apiHuntsHandler = new lambda.Function(this, 'apiHuntsHandler', {
       runtime: lambda.Runtime.NODEJS_14_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/hello')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/hunts')),
       memorySize: 512,
     });
+
+    // ============================================================
+    // API Gateway
+    // ============================================================
 
     const apiGateway = new apigw.LambdaRestApi(this, 'apiGateway', {
       handler: apiDefaultHandler,
       proxy: false,
     });
 
+    const apiAuthorizerHandler = new lambda.Function(
+      this,
+      'apiAuthorizerHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        handler: 'index.handler',
+        code: lambda.Code.fromAsset(path.join(__dirname, '../../api/auth')),
+        memorySize: 512,
+        environment: {
+          apiId: apiGateway.restApiId,
+        },
+      }
+    );
+
+    const authorizer = new apigw.TokenAuthorizer(this, 'authorizer', {
+      handler: apiAuthorizerHandler,
+    });
+
     const apiRoute = apiGateway.root.addResource('api');
 
-    const apiHelloRoute = apiRoute.addResource('hello');
-    apiHelloRoute.addMethod(
+    const apiHuntsRoute = apiRoute.addResource('hunts');
+    apiHuntsRoute.addMethod(
       'GET',
-      new apigw.LambdaIntegration(apiHelloHandler)
+      new apigw.LambdaIntegration(apiHuntsHandler),
+      {
+        authorizer,
+      }
     );
+
+    // ============================================================
+    // S3 Static Website Hosting
+    // ============================================================
 
     const uiBucket = new s3.Bucket(this, 'uiBucket', {
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -62,6 +164,10 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       destinationBucket: uiBucket,
     });
 
+    // ============================================================
+    // CloudFront to S3
+    // ============================================================
+
     const cfOriginAccessIdentity = new cloudfront.OriginAccessIdentity(
       this,
       'cfOriginAccessIdentity',
@@ -85,21 +191,6 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       {
         originConfigs: [
           {
-            customOriginSource: {
-              domainName: `${apiGateway.restApiId}.execute-api.${this.region}.${this.urlSuffix}`,
-            },
-            originPath: `/${apiGateway.deploymentStage.stageName}`,
-            behaviors: [
-              {
-                allowedMethods: cloudfront.CloudFrontAllowedMethods.ALL,
-                pathPattern: 'api/*',
-                defaultTtl: Duration.millis(0),
-                minTtl: Duration.millis(0),
-                maxTtl: Duration.millis(0),
-              },
-            ],
-          },
-          {
             s3OriginSource: {
               s3BucketSource: uiBucket,
               originAccessIdentity: cfOriginAccessIdentity,
@@ -114,8 +205,28 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       }
     );
 
+    // ============================================================
+    // Outputs
+    // ============================================================
+
     new cdk.CfnOutput(this, 'distributionDomainName', {
       value: distribution.distributionDomainName,
+    });
+
+    new cdk.CfnOutput(this, 'apiGatewayDomainName', {
+      value: apiGateway.url,
+    });
+
+    new cdk.CfnOutput(this, 'cognitoUserPoolId', {
+      value: userPool.userPoolId,
+    });
+
+    new cdk.CfnOutput(this, 'cognitoUserPoolClientId', {
+      value: userPoolClient.userPoolClientId,
+    });
+
+    new cdk.CfnOutput(this, 'cognitoUserPoolDomain', {
+      value: userPoolDomain.domainName,
     });
   }
 }
