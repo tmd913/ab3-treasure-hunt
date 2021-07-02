@@ -38,8 +38,6 @@ export const handler = function (
 ) {
   let decoded: DecodedToken = jwt_decode(event.authorizationToken);
 
-  console.log('Method ARN: ' + event.methodArn);
-
   callback(
     null,
     generatePolicy(decoded.sub, 'allow', decoded['cognito:groups'])
@@ -47,25 +45,53 @@ export const handler = function (
 };
 
 /**
- * Resources (API Gateway ARNs) that each Cognito Group can access
+ * Generate Resources (API Gateway ARNs) that each user can access
+ * @param playerId UUID of player
+ * @param groups Cognito Groups that user belongs to
+ * @returns Array of Resource ARNs
  */
-const resources: { [group: string]: string[] } = {
-  Players: [
-    `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/hunts`,
-  ],
+const generateResources = (playerId: string, groups: string[]): string[] => {
+  return groups.reduce((prev, curr) => {
+    let resources: string[];
+    switch (curr) {
+      case 'Players':
+        resources = [
+          `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/players/${playerId}/hunts`,
+          `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/players/${playerId}/hunts/*`,
+          `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/PUT/api/players/${playerId}/hunts/*`,
+          `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/map`,
+        ];
+        break;
+      case 'Admins':
+        resources = [
+          `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/hunts`,
+          `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/POST/api/hunts`,
+          `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/map`,
+        ];
+        break;
+      case 'Developers':
+        resources = [
+          `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/hunts`,
+        ];
+        break;
+      default:
+        resources = [];
+    }
+    return [...prev, ...resources];
+  }, new Array<string>());
 };
 
 /**
  * Helper function to generate an IAM policy
  * @param principalId UUID of user making API request
  * @param effect allow | deny
- * @param group Players | Admins | Developers
+ * @param groups Players | Admins | Developers
  * @returns Auth Response, including IAM policy
  */
 const generatePolicy = (
   principalId: string,
   effect: string,
-  group: string[]
+  groups: string[]
 ) => {
   const authResponse: AuthResponse = {
     principalId,
@@ -78,12 +104,7 @@ const generatePolicy = (
     },
   };
 
-  const allowedResources = group.reduce(
-    (prev, curr) => (resources[curr] ? [...prev, ...resources[curr]] : prev),
-    new Array<string>()
-  );
-
-  console.log(allowedResources);
+  const allowedResources = generateResources(principalId, groups);
 
   authResponse.policyDocument.Statement[0] = {
     ...{ Action: 'execute-api:Invoke' },
@@ -97,8 +118,6 @@ const generatePolicy = (
           Resource: '*',
         }),
   };
-
-  console.log(authResponse);
 
   return authResponse;
 };
