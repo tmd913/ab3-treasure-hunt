@@ -8,7 +8,6 @@ import * as cloudfront from '@aws-cdk/aws-cloudfront';
 import * as iam from '@aws-cdk/aws-iam';
 import * as cognito from '@aws-cdk/aws-cognito';
 import { Duration } from '@aws-cdk/core';
-import { OAuthScope, UserPoolClient } from '@aws-cdk/aws-cognito';
 
 export class Ab3TreasureHuntStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -60,14 +59,18 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
         flows: {
           authorizationCodeGrant: true,
         },
-        scopes: [OAuthScope.EMAIL, OAuthScope.OPENID, OAuthScope.PROFILE],
+        scopes: [
+          cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.PROFILE,
+        ],
         callbackUrls: ['http://localhost:3000'],
         logoutUrls: ['http://localhost:3000'],
       },
       generateSecret: false,
       refreshTokenValidity: Duration.days(30),
-      accessTokenValidity: Duration.hours(1),
-      idTokenValidity: Duration.hours(1),
+      accessTokenValidity: Duration.hours(12),
+      idTokenValidity: Duration.hours(12),
     });
 
     const userPoolDomain = new cognito.UserPoolDomain(
@@ -82,7 +85,7 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     );
 
     // ============================================================
-    // API Lambdas
+    // API Integration Lambdas
     // ============================================================
 
     const apiDefaultHandler = new lambda.Function(this, 'apiDefaultHandler', {
@@ -92,10 +95,63 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       memorySize: 512,
     });
 
-    const apiHuntsHandler = new lambda.Function(this, 'apiHuntsHandler', {
+    const getPlayerHuntsHandler = new lambda.Function(
+      this,
+      'getPlayerHuntsHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        handler: 'index.handler',
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, '../../api/getPlayerHunts')
+        ),
+        memorySize: 512,
+      }
+    );
+
+    const getPlayerHuntHandler = new lambda.Function(
+      this,
+      'getPlayerHuntHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        handler: 'index.handler',
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, '../../api/getPlayerHunt')
+        ),
+        memorySize: 512,
+      }
+    );
+
+    const updatePlayerHuntHandler = new lambda.Function(
+      this,
+      'updatePlayerHuntHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        handler: 'index.handler',
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, '../../api/updatePlayerHunt')
+        ),
+        memorySize: 512,
+      }
+    );
+
+    const getHuntsHandler = new lambda.Function(this, 'getHuntsHandler', {
       runtime: lambda.Runtime.NODEJS_14_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/hunts')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/getHunts')),
+      memorySize: 512,
+    });
+
+    const createHuntHandler = new lambda.Function(this, 'createHuntHandler', {
+      runtime: lambda.Runtime.NODEJS_14_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/createHunt')),
+      memorySize: 512,
+    });
+
+    const getMapHandler = new lambda.Function(this, 'getMapHandler', {
+      runtime: lambda.Runtime.NODEJS_14_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/getMap')),
       memorySize: 512,
     });
 
@@ -124,18 +180,54 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
 
     const authorizer = new apigw.TokenAuthorizer(this, 'authorizer', {
       handler: apiAuthorizerHandler,
+      resultsCacheTtl: Duration.seconds(0),
     });
 
+    // ==> /api
     const apiRoute = apiGateway.root.addResource('api');
 
-    const apiHuntsRoute = apiRoute.addResource('hunts');
-    apiHuntsRoute.addMethod(
+    const playersRoute = apiRoute.addResource('players');
+    const playerRoute = playersRoute.addResource('{player}');
+
+    // ==> /api/players/{player}/hunts
+    const playerHunts = playerRoute.addResource('hunts');
+    playerHunts.addMethod(
       'GET',
-      new apigw.LambdaIntegration(apiHuntsHandler),
+      new apigw.LambdaIntegration(getPlayerHuntsHandler),
+      { authorizer }
+    );
+
+    // ==> /api/players/{player}/hunts/{hunt}
+    const playerHunt = playerHunts.addResource('{hunt}');
+    playerHunt.addMethod(
+      'GET',
+      new apigw.LambdaIntegration(getPlayerHuntHandler),
+      { authorizer }
+    );
+    playerHunt.addMethod(
+      'PUT',
+      new apigw.LambdaIntegration(updatePlayerHuntHandler),
+      { authorizer }
+    );
+
+    // ==> /api/hunts
+    const huntsRoute = apiRoute.addResource('hunts');
+    huntsRoute.addMethod('GET', new apigw.LambdaIntegration(getHuntsHandler), {
+      authorizer,
+    });
+    huntsRoute.addMethod(
+      'POST',
+      new apigw.LambdaIntegration(createHuntHandler),
       {
         authorizer,
       }
     );
+
+    // ==> /api/map
+    const mapRoute = apiRoute.addResource('map');
+    mapRoute.addMethod('GET', new apigw.LambdaIntegration(getMapHandler), {
+      authorizer,
+    });
 
     // ============================================================
     // S3 Static Website Hosting

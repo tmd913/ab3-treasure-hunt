@@ -43,24 +43,21 @@ const App = () => {
   const [dot, setDot] = useState<Element>();
   const [counter, setCounter] = useState<number>(0);
 
-  useEffect(() => {
-    const fetchCredentials = async () => {
-      setCredentials(await Auth.currentUserCredentials());
-    };
+  // useEffect(() => {
+  //   const fetchCredentials = async () => {
+  //     setCredentials(await Auth.currentUserCredentials());
+  //   };
 
-    fetchCredentials();
-    console.log(credentials);
-  }, []);
+  //   fetchCredentials();
+  //   console.log(credentials);
+  // }, []);
 
   useEffect(() => {
     Hub.listen('auth', async ({ payload: { event, data } }) => {
       switch (event) {
         case 'cognitoHostedUI':
           let user: CognitoUser = await Auth.currentAuthenticatedUser();
-          console.log(user.getSignInUserSession()?.getIdToken());
-          console.log(
-            user.getSignInUserSession()?.getIdToken()?.decodePayload()
-          );
+          console.log(user.getSignInUserSession()?.getIdToken().getJwtToken());
           break;
         case 'cognitoHostedUI_failure':
           console.error(data);
