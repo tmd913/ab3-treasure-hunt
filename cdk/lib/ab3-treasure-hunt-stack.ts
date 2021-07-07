@@ -7,6 +7,8 @@ import * as s3Deployment from '@aws-cdk/aws-s3-deployment';
 import * as cloudfront from '@aws-cdk/aws-cloudfront';
 import * as iam from '@aws-cdk/aws-iam';
 import * as cognito from '@aws-cdk/aws-cognito';
+import * as dynamodb from '@aws-cdk/aws-dynamodb';
+import { ProjectionType, TableEncryption } from '@aws-cdk/aws-dynamodb';
 import { Duration } from '@aws-cdk/core';
 
 export class Ab3TreasureHuntStack extends cdk.Stack {
@@ -85,6 +87,85 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     );
 
     // ============================================================
+    // DynamoDB Tables
+    // ============================================================
+
+    const playerHuntsTable = new dynamodb.Table(this, 'PlayerHuntsTable', {
+      partitionKey: {
+        name: 'PlayerID',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'HuntID',
+        type: dynamodb.AttributeType.STRING,
+      },
+      readCapacity: 5,
+      writeCapacity: 5,
+      encryption: TableEncryption.AWS_MANAGED,
+    });
+
+    playerHuntsTable.addGlobalSecondaryIndex({
+      indexName: 'PlayerHuntTypeIndex',
+      partitionKey: {
+        name: 'PlayerID',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'HuntTypeTime',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: ProjectionType.ALL,
+    });
+
+    playerHuntsTable.addGlobalSecondaryIndex({
+      indexName: 'HuntTypeIndex',
+      partitionKey: {
+        name: 'HuntType',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'HuntTypeTime',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: ProjectionType.ALL,
+    });
+
+    playerHuntsTable.addGlobalSecondaryIndex({
+      indexName: 'CreatedAtIndex',
+      partitionKey: {
+        name: 'CreatedYear',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      sortKey: {
+        name: 'CreatedAt',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: ProjectionType.ALL,
+    });
+
+    playerHuntsTable.addGlobalSecondaryIndex({
+      indexName: 'CreatedByIndex',
+      partitionKey: {
+        name: 'CreatedBy',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'CreatedAt',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: ProjectionType.ALL,
+    });
+    const playersTable = new dynamodb.Table(this, 'PlayersTable', {
+      partitionKey: {
+        name: 'Email',
+        type: dynamodb.AttributeType.STRING,
+      },
+      readCapacity: 5,
+      writeCapacity: 5,
+      encryption: TableEncryption.AWS_MANAGED,
+    });
+
+    // ============================================================
     // API Integration Lambdas
     // ============================================================
 
@@ -139,6 +220,9 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       handler: 'index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../api/getHunts')),
       memorySize: 512,
+      environment: {
+        PLAYER_HUNTS_TABLE: playerHuntsTable.tableName,
+      },
     });
 
     const createHuntHandler = new lambda.Function(this, 'createHuntHandler', {
@@ -154,6 +238,14 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, '../../api/getMap')),
       memorySize: 512,
     });
+
+    // grant read/write permission to DynamoDB tables
+    playerHuntsTable.grantReadWriteData(getPlayerHuntsHandler);
+    playerHuntsTable.grantReadWriteData(getPlayerHuntHandler);
+    playerHuntsTable.grantReadWriteData(updatePlayerHuntHandler);
+    playerHuntsTable.grantReadWriteData(getHuntsHandler);
+    playerHuntsTable.grantReadWriteData(createHuntHandler);
+    playersTable.grantReadWriteData(createHuntHandler);
 
     // ============================================================
     // API Gateway
