@@ -1,5 +1,6 @@
 import * as cdk from '@aws-cdk/core';
 import * as lambda from '@aws-cdk/aws-lambda';
+import * as lambdaNode from '@aws-cdk/aws-lambda-nodejs';
 import * as path from 'path';
 import * as apigw from '@aws-cdk/aws-apigateway';
 import * as s3 from '@aws-cdk/aws-s3';
@@ -169,73 +170,85 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     // API Integration Lambdas
     // ============================================================
 
-    const apiDefaultHandler = new lambda.Function(this, 'apiDefaultHandler', {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/default')),
-      memorySize: 512,
-    });
+    const apiDefaultHandler = new lambdaNode.NodejsFunction(
+      this,
+      'apiDefaultHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        entry: path.join(__dirname, '../api/default/index.ts'),
+        memorySize: 512,
+      }
+    );
 
-    const getPlayerHuntsHandler = new lambda.Function(
+    const getPlayerHuntsHandler = new lambdaNode.NodejsFunction(
       this,
       'getPlayerHuntsHandler',
       {
         runtime: lambda.Runtime.NODEJS_14_X,
-        handler: 'index.handler',
-        code: lambda.Code.fromAsset(
-          path.join(__dirname, '../../api/getPlayerHunts')
-        ),
+        entry: path.join(__dirname, '../api/getPlayerHunts/index.ts'),
         memorySize: 512,
+        environment: {
+          PLAYER_HUNTS_TABLE: playerHuntsTable.tableName,
+        },
       }
     );
 
-    const getPlayerHuntHandler = new lambda.Function(
+    const getPlayerHuntHandler = new lambdaNode.NodejsFunction(
       this,
       'getPlayerHuntHandler',
       {
         runtime: lambda.Runtime.NODEJS_14_X,
-        handler: 'index.handler',
-        code: lambda.Code.fromAsset(
-          path.join(__dirname, '../../api/getPlayerHunt')
-        ),
+        entry: path.join(__dirname, '../api/getPlayerHunt/index.ts'),
         memorySize: 512,
+        environment: {
+          PLAYER_HUNTS_TABLE: playerHuntsTable.tableName,
+        },
       }
     );
 
-    const updatePlayerHuntHandler = new lambda.Function(
+    const updatePlayerHuntHandler = new lambdaNode.NodejsFunction(
       this,
       'updatePlayerHuntHandler',
       {
         runtime: lambda.Runtime.NODEJS_14_X,
-        handler: 'index.handler',
-        code: lambda.Code.fromAsset(
-          path.join(__dirname, '../../api/updatePlayerHunt')
-        ),
+        entry: path.join(__dirname, '../api/updatePlayerHunt/index.ts'),
         memorySize: 512,
+        environment: {
+          PLAYER_HUNTS_TABLE: playerHuntsTable.tableName,
+        },
       }
     );
 
-    const getHuntsHandler = new lambda.Function(this, 'getHuntsHandler', {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/getHunts')),
-      memorySize: 512,
-      environment: {
-        PLAYER_HUNTS_TABLE: playerHuntsTable.tableName,
-      },
-    });
+    const getHuntsHandler = new lambdaNode.NodejsFunction(
+      this,
+      'getHuntsHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        entry: path.join(__dirname, '../api/getHunts/index.ts'),
+        memorySize: 512,
+        environment: {
+          PLAYER_HUNTS_TABLE: playerHuntsTable.tableName,
+        },
+      }
+    );
 
-    const createHuntHandler = new lambda.Function(this, 'createHuntHandler', {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/createHunt')),
-      memorySize: 512,
-    });
+    const createHuntHandler = new lambdaNode.NodejsFunction(
+      this,
+      'createHuntHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        entry: path.join(__dirname, '../api/createHunt/index.ts'),
+        memorySize: 512,
+        environment: {
+          PLAYER_HUNTS_TABLE: playerHuntsTable.tableName,
+          PLAYERS_TABLE: playersTable.tableName,
+        },
+      }
+    );
 
-    const getMapHandler = new lambda.Function(this, 'getMapHandler', {
+    const getMapHandler = new lambdaNode.NodejsFunction(this, 'getMapHandler', {
       runtime: lambda.Runtime.NODEJS_14_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../api/getMap')),
+      entry: path.join(__dirname, '../api/getMap/index.ts'),
       memorySize: 512,
     });
 
@@ -256,13 +269,12 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       proxy: false,
     });
 
-    const apiAuthorizerHandler = new lambda.Function(
+    const apiAuthorizerHandler = new lambdaNode.NodejsFunction(
       this,
       'apiAuthorizerHandler',
       {
         runtime: lambda.Runtime.NODEJS_14_X,
-        handler: 'index.handler',
-        code: lambda.Code.fromAsset(path.join(__dirname, '../../api/auth')),
+        entry: path.join(__dirname, '../api/auth/index.ts'),
         memorySize: 512,
         environment: {
           apiId: apiGateway.restApiId,

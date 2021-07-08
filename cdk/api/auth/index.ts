@@ -15,9 +15,6 @@ interface DecodedToken {
   sub: string;
   'cognito:groups': string[];
   email_verified: boolean;
-  address: {
-    formatted: string;
-  };
   iss: string;
   'cognito:username': string;
   origin_jti: string;
@@ -40,7 +37,12 @@ export const handler = function (
 
   callback(
     null,
-    generatePolicy(decoded.sub, 'allow', decoded['cognito:groups'])
+    generatePolicy(
+      decoded.sub,
+      decoded.email,
+      'allow',
+      decoded['cognito:groups']
+    )
   );
 };
 
@@ -90,6 +92,7 @@ const generateResources = (playerId: string, groups: string[]): string[] => {
  */
 const generatePolicy = (
   principalId: string,
+  email: string,
   effect: string,
   groups: string[]
 ) => {
@@ -101,6 +104,7 @@ const generatePolicy = (
     },
     context: {
       uuid: principalId,
+      email,
     },
   };
 

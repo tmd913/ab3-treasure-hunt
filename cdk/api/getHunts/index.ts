@@ -3,11 +3,13 @@ import {
   APIGatewayProxyResult,
   Context,
 } from 'aws-lambda';
-import { DynamoDB, AWSError } from 'aws-sdk';
+import { DynamoDB } from 'aws-sdk';
+import { createError } from '../utils';
+
 const docClient = new DynamoDB.DocumentClient();
 
 export const handler = async (
-  event: APIGatewayProxyEventBase<{ uuid: string }>,
+  event: APIGatewayProxyEventBase<{ uuid: string; email: string }>,
   _context: Context
 ): Promise<APIGatewayProxyResult> => {
   if (!process.env.PLAYER_HUNTS_TABLE) {
@@ -95,18 +97,4 @@ const getHuntsByType = (
       ScanIndexForward: isSortOrderAsc,
     })
     .promise();
-};
-
-/**
- * Create API Gateway Error Object
- * @param err Error Object
- * @returns Object to be returned by API Gateway
- */
-const createError = (err: Partial<AWSError>): APIGatewayProxyResult => {
-  return {
-    body: JSON.stringify({
-      message: err?.message || 'Internal Server Error',
-    }),
-    statusCode: err?.statusCode || 500,
-  };
 };
