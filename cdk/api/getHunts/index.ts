@@ -4,6 +4,7 @@ import {
   Context,
 } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
+import { HuntType } from '../enums';
 import { createError } from '../utils';
 
 const docClient = new DynamoDB.DocumentClient();
@@ -19,8 +20,9 @@ export const handler = async (
     });
   }
 
-  const uuid = event.requestContext.authorizer.uuid;
-  const type = event.queryStringParameters?.type;
+  const typeStr = event.queryStringParameters?.type;
+  // convert string to HuntType
+  const type: HuntType = typeStr?.toUpperCase() as HuntType;
   // default to current year if none is provided or if invalid
   const year =
     event.queryStringParameters?.year?.length === 4
@@ -72,18 +74,16 @@ const getHuntsAllTypes = (isSortOrderAsc: boolean, year: number) => {
 
 /**
  * Get all hunts of a given type in a given year, sorted by last modified time
- * @param type Hunt type (CREATED|ACCEPTED|DENIED|STARTED|COMPLETED)
+ * @param type Hunt type
  * @param isSortOrderAsc Is ascending sort order
  * @param year Created year
  * @returns Query with all hunts for given type and year
  */
 const getHuntsByType = (
-  type: string,
+  type: HuntType,
   isSortOrderAsc: boolean,
   year: number
 ) => {
-  const typeUpper = type.toUpperCase();
-
   return docClient
     .query({
       TableName: process.env.PLAYER_HUNTS_TABLE!,
@@ -91,8 +91,8 @@ const getHuntsByType = (
       KeyConditionExpression:
         'HuntType = :type AND begins_with(HuntTypeTime, :typeTime)',
       ExpressionAttributeValues: {
-        ':type': typeUpper,
-        ':typeTime': typeUpper + '#' + year,
+        ':type': type,
+        ':typeTime': type + '#' + year,
       },
       ScanIndexForward: isSortOrderAsc,
     })

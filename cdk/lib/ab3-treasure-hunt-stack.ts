@@ -27,6 +27,12 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       autoVerify: {
         email: true,
       },
+      customAttributes: {
+        zipCode: new cognito.NumberAttribute({
+          min: 5,
+          max: 5,
+        }),
+      },
       passwordPolicy: {
         tempPasswordValidity: Duration.days(7),
         minLength: 8,
@@ -46,6 +52,11 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
 
     new cognito.CfnUserPoolGroup(this, 'AdminsGroup', {
       groupName: 'Admins',
+      userPoolId: userPool.userPoolId,
+    });
+
+    new cognito.CfnUserPoolGroup(this, 'DevsGroup', {
+      groupName: 'Devs',
       userPoolId: userPool.userPoolId,
     });
 
