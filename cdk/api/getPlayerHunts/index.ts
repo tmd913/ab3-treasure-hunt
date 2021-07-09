@@ -9,6 +9,10 @@ import { createError } from '../utils';
 
 const docClient = new DynamoDB.DocumentClient();
 
+interface GetPlayerHuntsBody {
+  lastEvaluatedKey: DynamoDB.DocumentClient.Key;
+}
+
 export const handler = async (
   event: APIGatewayProxyEventBase<{ uuid: string; email: string }>,
   _context: Context
@@ -21,7 +25,14 @@ export const handler = async (
   }
 
   const playerID = event?.pathParameters?.player;
-  const typeStr = event.queryStringParameters?.type;
+  const {
+    type: typeStr,
+    sortOrder,
+    limit,
+    lastEvaluatedHuntID,
+    lastEvaluatedHuntTypeTime,
+  } = event.queryStringParameters || {};
+
   // convert string to HuntType
   const type: HuntType = typeStr?.toUpperCase() as HuntType;
 
@@ -33,23 +44,46 @@ export const handler = async (
   }
 
   // default to DESC sort order unless ASC is specified
-  const isSortOrderAsc =
-    event.queryStringParameters?.sortOrder?.toLowerCase() === 'asc'
-      ? true
-      : false;
+  const isSortOrderAsc = sortOrder?.toLowerCase() === 'asc' ? true : false;
+
+  const lastEvaluatedKeyInput =
+    lastEvaluatedHuntID && lastEvaluatedHuntTypeTime
+      ? {
+          PlayerID: playerID,
+          HuntID: lastEvaluatedHuntID,
+          HuntTypeTime: lastEvaluatedHuntTypeTime,
+        }
+      : undefined;
 
   let hunts: DynamoDB.DocumentClient.QueryOutput;
   try {
     // call appropriate method depending on if hunt type is provided
-    hunts = await getPlayerHuntsByType(playerID, type, isSortOrderAsc);
+    hunts = await getPlayerHuntsByType(
+      playerID,
+      type,
+      isSortOrderAsc,
+      2,
+      lastEvaluatedKeyInput
+    );
   } catch (err) {
     return createError(err);
   }
 
+  const lastEvaluatedKeyOutput = hunts.LastEvaluatedKey;
+
+  let returnBody = {
+    items: hunts.Items || [],
+  };
+
+  if (lastEvaluatedKeyOutput) {
+    returnBody = {
+      ...returnBody,
+      ...{ lastEvaluatedKey: lastEvaluatedKeyOutput },
+    };
+  }
+
   return {
-    body: JSON.stringify({
-      items: hunts.Items,
-    }),
+    body: JSON.stringify(returnBody),
     statusCode: 200,
   };
 };
@@ -64,20 +98,26 @@ const getPlayerHuntsByType = (
   playerID: string,
   type: HuntType,
   isSortOrderAsc: boolean,
-  page = 0,
-  size = 20
+  limit = 20,
+  lastEvaluatedKey?: DynamoDB.DocumentClient.Key
 ) => {
-  return docClient
-    .query({
-      TableName: process.env.PLAYER_HUNTS_TABLE!,
-      IndexName: 'PlayerHuntTypeIndex',
-      KeyConditionExpression:
-        'PlayerID = :player AND begins_with(HuntTypeTime, :type)',
-      ExpressionAttributeValues: {
-        ':player': playerID,
-        ':type': type,
-      },
-      ScanIndexForward: isSortOrderAsc,
-    })
-    .promise();
+  // TODO: apply appropriate projections depending on type, add paging
+  let params: DynamoDB.DocumentClient.QueryInput = {
+    TableName: process.env.PLAYER_HUNTS_TABLE!,
+    IndexName: 'PlayerHuntTypeIndex',
+    KeyConditionExpression:
+      'PlayerID = :player AND begins_with(HuntTypeTime, :type)',
+    ExpressionAttributeValues: {
+      ':player': playerID,
+      ':type': type,
+    },
+    ScanIndexForward: isSortOrderAsc,
+    Limit: limit,
+  };
+
+  if (lastEvaluatedKey) {
+    params = { ...params, ExclusiveStartKey: lastEvaluatedKey };
+  }
+
+  return docClient.query(params).promise();
 };
