@@ -1,5 +1,6 @@
 import { APIGatewayProxyResult } from 'aws-lambda';
 import { AWSError } from 'aws-sdk';
+import { Location } from '../interfaces';
 
 /**
  * Create API Gateway Error Object
@@ -13,4 +14,19 @@ export const createError = (err: Partial<AWSError>): APIGatewayProxyResult => {
     }),
     statusCode: err?.statusCode || 500,
   };
+};
+
+/**
+ * Checks if the latitude and longitude for the location are invalid
+ * @param location Latitude and longitude of location
+ * @returns Boolean stating invalidity
+ */
+export const isInvalidLocation = (location: Location): boolean => {
+  const { latitude, longitude } = location;
+  return (
+    latitude == null ||
+    longitude == null ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180
+  );
 };

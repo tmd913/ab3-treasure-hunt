@@ -4,56 +4,35 @@ import {
   Context,
 } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
-import { createError } from '../utils';
+import { createError, isInvalidLocation } from '../utils';
 import { v4 as uuidv4 } from 'uuid';
 import { HuntType } from '../enums';
+import { CreateHuntBody } from '../interfaces';
 
 const docClient = new DynamoDB.DocumentClient();
-
-interface TreasureLocation {
-  latitude: number;
-  longitude: number;
-}
-interface CreateHuntBody {
-  playerID: string;
-  playerEmail: string;
-  treasureImage: string;
-  treasureDescription: string;
-  treasureLocation: TreasureLocation;
-  triggerDistance: number;
-}
 
 export const handler = async (
   event: APIGatewayProxyEventBase<{ uuid: string; email: string }>,
   _context: Context
 ): Promise<APIGatewayProxyResultV2> => {
   if (!process.env.PLAYER_HUNTS_TABLE) {
-    createError({
+    return createError({
       message: 'Player Hunts Table name not provided!',
       statusCode: 500,
     });
   }
 
   const adminEmail = event.requestContext.authorizer.email;
-  const body: CreateHuntBody = JSON.parse(event.body!);
+  const body: CreateHuntBody = event.body ? JSON.parse(event.body) : {};
 
-  // all body properties must exist
-  if (
-    !body.playerID ||
-    !body.playerEmail ||
-    !body.treasureImage ||
-    !body.treasureDescription ||
-    !body.treasureLocation.latitude ||
-    !body.treasureLocation.longitude ||
-    !body.triggerDistance
-  ) {
+  if (isMissingBodyProperty(body)) {
     return createError({
       message: 'Must provide all required properties in body!',
       statusCode: 400,
     });
   }
 
-  if (!isValidLocation(body.treasureLocation)) {
+  if (isInvalidLocation(body.treasureLocation)) {
     return createError({
       message: 'Must provide valid latitude and longitude values!',
       statusCode: 400,
@@ -73,13 +52,18 @@ export const handler = async (
 };
 
 /**
- * Checks if the latitude and longitude for the location are valid
- * @param location Latitude and longitude of location
- * @returns Boolean stating validity
+ * Checks if the body is missing a required property
+ * @param body Request body for creating hunt
+ * @returns Boolean stating if body is missing properties
  */
-const isValidLocation = (location: TreasureLocation): boolean => {
+const isMissingBodyProperty = (body: CreateHuntBody): boolean => {
   return (
-    Math.abs(location.latitude) <= 90 && Math.abs(location.longitude) <= 180
+    !body.playerID ||
+    !body.playerEmail ||
+    !body.treasureImage ||
+    !body.treasureDescription ||
+    !body.treasureLocation ||
+    !body.triggerDistance
   );
 };
 
@@ -93,7 +77,7 @@ const createHunt = (adminEmail: string, body: CreateHuntBody) => {
     playerEmail,
     treasureImage,
     treasureDescription,
-    treasureLocation,
+    treasureLocation: { latitude, longitude },
     triggerDistance,
   } = body;
 
@@ -108,8 +92,8 @@ const createHunt = (adminEmail: string, body: CreateHuntBody) => {
         TreasureImage: treasureImage,
         TreasureDescription: treasureDescription,
         TreasureLocation: {
-          Latitude: treasureLocation.latitude,
-          Longitude: treasureLocation.longitude,
+          latitude,
+          longitude,
         },
         TriggerDistance: triggerDistance,
         CreatedBy: adminEmail,
