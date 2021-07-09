@@ -246,12 +246,6 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       }
     );
 
-    const getMapHandler = new lambdaNode.NodejsFunction(this, 'getMapHandler', {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      entry: path.join(__dirname, '../api/getMap/index.ts'),
-      memorySize: 512,
-    });
-
     // grant read/write permission to DynamoDB tables
     playerHuntsTable.grantReadWriteData(getPlayerHuntsHandler);
     playerHuntsTable.grantReadWriteData(getPlayerHuntHandler);
@@ -326,12 +320,6 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
         authorizer,
       }
     );
-
-    // ==> /api/map
-    const mapRoute = apiRoute.addResource('map');
-    mapRoute.addMethod('GET', new apigw.LambdaIntegration(getMapHandler), {
-      authorizer,
-    });
 
     // ============================================================
     // S3 Static Website Hosting
