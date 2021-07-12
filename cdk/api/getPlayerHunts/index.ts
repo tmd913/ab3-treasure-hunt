@@ -21,6 +21,7 @@ export const handler = async (
   }
 
   const playerID = event?.pathParameters?.player;
+
   const {
     type: typeStr,
     sortOrder,

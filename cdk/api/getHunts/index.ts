@@ -9,6 +9,15 @@ import { createError } from '../utils';
 
 const docClient = new DynamoDB.DocumentClient();
 
+interface LastEvaluatedKeyAttributes {
+  lastEvaluatedPlayerID?: string;
+  lastEvaluatedHuntID?: string;
+  lastEvaluatedHuntType?: string;
+  lastEvaluatedHuntTypeTime?: string;
+  lastEvaluatedCreatedYear?: string;
+  lastEvaluatedCreatedAt?: string;
+}
+
 export const handler = async (
   event: APIGatewayProxyEventBase<{ uuid: string; email: string }>,
   _context: Context
@@ -20,36 +29,119 @@ export const handler = async (
     });
   }
 
-  const typeStr = event.queryStringParameters?.type;
-  // convert string to HuntType
+  const {
+    year: yearStr,
+    type: typeStr,
+    sortOrder,
+    limit: limitStr,
+    lastEvaluatedPlayerID,
+    lastEvaluatedHuntID,
+    lastEvaluatedHuntType,
+    lastEvaluatedHuntTypeTime,
+    lastEvaluatedCreatedYear,
+    lastEvaluatedCreatedAt,
+  } = event.queryStringParameters || {};
+
+  const year = yearStr?.length === 4 ? +yearStr : new Date().getUTCFullYear();
+
+  // convert hunt type string to HuntType enum
   const type: HuntType = typeStr?.toUpperCase() as HuntType;
-  // default to current year if none is provided or if invalid
-  const year =
-    event.queryStringParameters?.year?.length === 4
-      ? +event.queryStringParameters?.year
-      : new Date().getUTCFullYear();
+
   // default to DESC sort order unless ASC is specified
-  const isSortOrderAsc =
-    event.queryStringParameters?.sortOrder?.toLowerCase() === 'asc'
-      ? true
-      : false;
+  const isSortOrderAsc = sortOrder?.toLowerCase() === 'asc' ? true : false;
+
+  // convert limit string to number, with default value of 20
+  const limit = limitStr ? +limitStr : 20;
+
+  const lastEvaluatedKeyInput = createLastEvaluatedKey({
+    lastEvaluatedPlayerID,
+    lastEvaluatedHuntID,
+    lastEvaluatedHuntType,
+    lastEvaluatedHuntTypeTime,
+    lastEvaluatedCreatedYear,
+    lastEvaluatedCreatedAt,
+  });
 
   let hunts: DynamoDB.DocumentClient.QueryOutput;
   try {
     // call appropriate method depending on if hunt type is provided
     hunts = await (type
-      ? getHuntsByType(type, isSortOrderAsc, year)
-      : getHuntsAllTypes(isSortOrderAsc, year));
+      ? getHuntsByType(type, isSortOrderAsc, year, limit, lastEvaluatedKeyInput)
+      : getHuntsAllTypes(isSortOrderAsc, year, limit, lastEvaluatedKeyInput));
   } catch (err) {
     return createError(err);
   }
 
+  const lastEvaluatedKeyOutput = hunts.LastEvaluatedKey;
+
+  let returnBody = {
+    items: hunts.Items || [],
+  };
+
+  if (lastEvaluatedKeyOutput) {
+    returnBody = {
+      ...returnBody,
+      ...{ lastEvaluatedKey: lastEvaluatedKeyOutput },
+    };
+  }
+
   return {
-    body: JSON.stringify({
-      items: hunts.Items,
-    }),
+    body: JSON.stringify(returnBody),
     statusCode: 200,
   };
+};
+
+/**
+ * Create the proper last evaluated key depending on the query type,
+ * or undefined if last evaluated key not provided
+ * @param lastEvaluatedKeyAttributes All possible last evaluated key attributes
+ * @returns Last evaluated key
+ */
+const createLastEvaluatedKey = (
+  lastEvaluatedKeyAttributes: LastEvaluatedKeyAttributes
+): DynamoDB.DocumentClient.Key | undefined => {
+  const {
+    lastEvaluatedPlayerID,
+    lastEvaluatedHuntID,
+    lastEvaluatedHuntType,
+    lastEvaluatedHuntTypeTime,
+    lastEvaluatedCreatedYear,
+    lastEvaluatedCreatedAt,
+  } = lastEvaluatedKeyAttributes;
+
+  // base table partition and sort keys required
+  if (!lastEvaluatedPlayerID || !lastEvaluatedHuntID) {
+    return undefined;
+  }
+
+  let lastEvaluatedKeyBase = {
+    PlayerID: lastEvaluatedPlayerID,
+    HuntID: lastEvaluatedHuntID,
+  };
+
+  // filtered by hunt type
+  if (lastEvaluatedHuntType && lastEvaluatedHuntTypeTime) {
+    return {
+      ...lastEvaluatedKeyBase,
+      ...{
+        HuntType: lastEvaluatedHuntType,
+        HuntTypeTime: lastEvaluatedHuntTypeTime,
+      },
+    };
+  }
+
+  // all hunt types
+  if (lastEvaluatedCreatedYear && lastEvaluatedCreatedAt) {
+    return {
+      ...lastEvaluatedKeyBase,
+      ...{
+        CreatedYear: +lastEvaluatedCreatedYear,
+        CreatedAt: lastEvaluatedCreatedAt,
+      },
+    };
+  }
+
+  return undefined;
 };
 
 /**
@@ -58,18 +150,28 @@ export const handler = async (
  * @param year Created year
  * @returns Query with all hunts for given year
  */
-const getHuntsAllTypes = (isSortOrderAsc: boolean, year: number) => {
-  return docClient
-    .query({
-      TableName: process.env.PLAYER_HUNTS_TABLE!,
-      IndexName: 'CreatedAtIndex',
-      KeyConditionExpression: 'CreatedYear = :year',
-      ExpressionAttributeValues: {
-        ':year': year,
-      },
-      ScanIndexForward: isSortOrderAsc,
-    })
-    .promise();
+const getHuntsAllTypes = (
+  isSortOrderAsc: boolean,
+  year: number,
+  limit: number,
+  lastEvaluatedKey?: DynamoDB.DocumentClient.Key
+) => {
+  let params: DynamoDB.DocumentClient.QueryInput = {
+    TableName: process.env.PLAYER_HUNTS_TABLE!,
+    IndexName: 'CreatedAtIndex',
+    KeyConditionExpression: 'CreatedYear = :year',
+    ExpressionAttributeValues: {
+      ':year': year,
+    },
+    ScanIndexForward: isSortOrderAsc,
+    Limit: limit,
+  };
+
+  if (lastEvaluatedKey) {
+    params = { ...params, ExclusiveStartKey: lastEvaluatedKey };
+  }
+
+  return docClient.query(params).promise();
 };
 
 /**
@@ -82,19 +184,26 @@ const getHuntsAllTypes = (isSortOrderAsc: boolean, year: number) => {
 const getHuntsByType = (
   type: HuntType,
   isSortOrderAsc: boolean,
-  year: number
+  year: number,
+  limit: number,
+  lastEvaluatedKey?: DynamoDB.DocumentClient.Key
 ) => {
-  return docClient
-    .query({
-      TableName: process.env.PLAYER_HUNTS_TABLE!,
-      IndexName: 'HuntTypeIndex',
-      KeyConditionExpression:
-        'HuntType = :type AND begins_with(HuntTypeTime, :typeTime)',
-      ExpressionAttributeValues: {
-        ':type': type,
-        ':typeTime': type + '#' + year,
-      },
-      ScanIndexForward: isSortOrderAsc,
-    })
-    .promise();
+  let params: DynamoDB.DocumentClient.QueryInput = {
+    TableName: process.env.PLAYER_HUNTS_TABLE!,
+    IndexName: 'HuntTypeIndex',
+    KeyConditionExpression:
+      'HuntType = :type AND begins_with(HuntTypeTime, :typeTime)',
+    ExpressionAttributeValues: {
+      ':type': type,
+      ':typeTime': type + '#' + year,
+    },
+    ScanIndexForward: isSortOrderAsc,
+    Limit: limit,
+  };
+
+  if (lastEvaluatedKey) {
+    params = { ...params, ExclusiveStartKey: lastEvaluatedKey };
+  }
+
+  return docClient.query(params).promise();
 };
