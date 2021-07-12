@@ -9,10 +9,6 @@ import { createError } from '../utils';
 
 const docClient = new DynamoDB.DocumentClient();
 
-interface GetPlayerHuntsBody {
-  lastEvaluatedKey: DynamoDB.DocumentClient.Key;
-}
-
 export const handler = async (
   event: APIGatewayProxyEventBase<{ uuid: string; email: string }>,
   _context: Context
@@ -28,12 +24,12 @@ export const handler = async (
   const {
     type: typeStr,
     sortOrder,
-    limit,
+    limit: limitStr,
     lastEvaluatedHuntID,
     lastEvaluatedHuntTypeTime,
   } = event.queryStringParameters || {};
 
-  // convert string to HuntType
+  // convert hunt type string to HuntType enum
   const type: HuntType = typeStr?.toUpperCase() as HuntType;
 
   if (!playerID || !type) {
@@ -46,6 +42,10 @@ export const handler = async (
   // default to DESC sort order unless ASC is specified
   const isSortOrderAsc = sortOrder?.toLowerCase() === 'asc' ? true : false;
 
+  // convert limit string to number, with default value of 20
+  const limit = limitStr ? +limitStr : 20;
+
+  // reconstruct last evaluated key using query params
   const lastEvaluatedKeyInput =
     lastEvaluatedHuntID && lastEvaluatedHuntTypeTime
       ? {
@@ -62,7 +62,7 @@ export const handler = async (
       playerID,
       type,
       isSortOrderAsc,
-      2,
+      limit,
       lastEvaluatedKeyInput
     );
   } catch (err) {
@@ -98,7 +98,7 @@ const getPlayerHuntsByType = (
   playerID: string,
   type: HuntType,
   isSortOrderAsc: boolean,
-  limit = 20,
+  limit: number,
   lastEvaluatedKey?: DynamoDB.DocumentClient.Key
 ) => {
   // TODO: apply appropriate projections depending on type, add paging
