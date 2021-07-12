@@ -4,7 +4,7 @@ import {
   Context,
 } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
-import { HuntType } from '../enums';
+import { HuntAttribute, HuntType } from '../enums';
 import { createError } from '../utils';
 
 const docClient = new DynamoDB.DocumentClient();
@@ -28,6 +28,26 @@ export const handler = async (
       statusCode: 500,
     });
   }
+
+  const projections = [
+    HuntAttribute.PLAYER_ID,
+    HuntAttribute.HUNT_ID,
+    HuntAttribute.PLAYER_EMAIL,
+    HuntAttribute.TREASURE_IMAGE,
+    HuntAttribute.TREASURE_DESCRIPTION,
+    HuntAttribute.TREASURE_LOCATION,
+    HuntAttribute.TRIGGER_DISTANCE,
+    HuntAttribute.CREATED_BY,
+    HuntAttribute.CREATED_AT,
+    HuntAttribute.CREATED_YEAR,
+    HuntAttribute.HUNT_TYPE,
+    HuntAttribute.HUNT_TYPE_TIME,
+    HuntAttribute.ACCEPTED_AT,
+    HuntAttribute.DENIED_AT,
+    HuntAttribute.STARTED_AT,
+    HuntAttribute.STOPPED_AT,
+    HuntAttribute.COMPLETED_AT,
+  ];
 
   const {
     year: yearStr,
@@ -66,8 +86,21 @@ export const handler = async (
   try {
     // call appropriate method depending on if hunt type is provided
     hunts = await (type
-      ? getHuntsByType(type, isSortOrderAsc, year, limit, lastEvaluatedKeyInput)
-      : getHuntsAllTypes(isSortOrderAsc, year, limit, lastEvaluatedKeyInput));
+      ? getHuntsByType(
+          type,
+          isSortOrderAsc,
+          year,
+          projections,
+          limit,
+          lastEvaluatedKeyInput
+        )
+      : getHuntsAllTypes(
+          isSortOrderAsc,
+          year,
+          projections,
+          limit,
+          lastEvaluatedKeyInput
+        ));
   } catch (err) {
     return createError(err);
   }
@@ -148,11 +181,15 @@ const createLastEvaluatedKey = (
  * Get all hunts in a given year, sorted by creation time
  * @param isSortOrderAsc Is ascending sort order
  * @param year Created year
+ * @param projections Projected DynamoDB attributes
+ * @param limit Max items retreived
+ * @param lastEvaluatedKey Last evaluated key
  * @returns Query with all hunts for given year
  */
 const getHuntsAllTypes = (
   isSortOrderAsc: boolean,
   year: number,
+  projections: HuntAttribute[],
   limit: number,
   lastEvaluatedKey?: DynamoDB.DocumentClient.Key
 ) => {
@@ -163,6 +200,7 @@ const getHuntsAllTypes = (
     ExpressionAttributeValues: {
       ':year': year,
     },
+    ProjectionExpression: projections.toString(),
     ScanIndexForward: isSortOrderAsc,
     Limit: limit,
   };
@@ -179,12 +217,16 @@ const getHuntsAllTypes = (
  * @param type Hunt type
  * @param isSortOrderAsc Is ascending sort order
  * @param year Created year
+ * @param projections Projected DynamoDB attributes
+ * @param limit Max items retreived
+ * @param lastEvaluatedKey Last evaluated key
  * @returns Query with all hunts for given type and year
  */
 const getHuntsByType = (
   type: HuntType,
   isSortOrderAsc: boolean,
   year: number,
+  projections: HuntAttribute[],
   limit: number,
   lastEvaluatedKey?: DynamoDB.DocumentClient.Key
 ) => {
@@ -197,6 +239,7 @@ const getHuntsByType = (
       ':type': type,
       ':typeTime': type + '#' + year,
     },
+    ProjectionExpression: projections.toString(),
     ScanIndexForward: isSortOrderAsc,
     Limit: limit,
   };

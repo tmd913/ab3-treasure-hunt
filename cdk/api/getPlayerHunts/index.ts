@@ -4,10 +4,47 @@ import {
   Context,
 } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
-import { HuntType } from '../enums';
+import { HuntAttribute, HuntType } from '../enums';
 import { createError } from '../utils';
 
 const docClient = new DynamoDB.DocumentClient();
+
+const PlayerHuntTypeProjections = {
+  CREATED: [
+    HuntAttribute.PLAYER_ID,
+    HuntAttribute.HUNT_ID,
+    HuntAttribute.CREATED_AT,
+    HuntAttribute.CREATED_BY,
+  ].toString(),
+  ACCEPTED: [
+    HuntAttribute.PLAYER_ID,
+    HuntAttribute.HUNT_ID,
+    HuntAttribute.ACCEPTED_AT,
+  ].toString(),
+  DENIED: [
+    HuntAttribute.PLAYER_ID,
+    HuntAttribute.HUNT_ID,
+    HuntAttribute.DENIED_AT,
+  ].toString(),
+  STARTED: [
+    HuntAttribute.PLAYER_ID,
+    HuntAttribute.HUNT_ID,
+    HuntAttribute.STARTED_AT,
+  ].toString(),
+  STOPPED: [
+    HuntAttribute.PLAYER_ID,
+    HuntAttribute.HUNT_ID,
+    HuntAttribute.STOPPED_AT,
+  ].toString(),
+  COMPLETED: [
+    HuntAttribute.PLAYER_ID,
+    HuntAttribute.HUNT_ID,
+    HuntAttribute.COMPLETED_AT,
+    HuntAttribute.TREASURE_IMAGE,
+    HuntAttribute.TREASURE_DESCRIPTION,
+    HuntAttribute.TREASURE_LOCATION,
+  ].toString(),
+};
 
 export const handler = async (
   event: APIGatewayProxyEventBase<{ uuid: string; email: string }>,
@@ -93,6 +130,8 @@ export const handler = async (
  * Get all player hunts by type, with paging
  * @param type Hunt type
  * @param isSortOrderAsc Is ascending sort order
+ * @param limit Max items retreived
+ * @param lastEvaluatedKey Last evaluated key
  * @returns Query with page of player hunts for given type
  */
 const getPlayerHuntsByType = (
@@ -112,6 +151,7 @@ const getPlayerHuntsByType = (
       ':player': playerID,
       ':type': type,
     },
+    ProjectionExpression: PlayerHuntTypeProjections[type],
     ScanIndexForward: isSortOrderAsc,
     Limit: limit,
   };

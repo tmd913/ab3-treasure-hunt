@@ -3,6 +3,13 @@ import { HuntAttribute } from '../enums';
 
 const docClient = new DynamoDB.DocumentClient();
 
+/**
+ * Get player hunt DynamoDB call
+ * @param playerID Player ID
+ * @param huntID Hunt ID
+ * @param projections Projected DynamoDB attributes
+ * @returns Player hunt information
+ */
 export const getPlayerHunt = (
   playerID: string,
   huntID: string,

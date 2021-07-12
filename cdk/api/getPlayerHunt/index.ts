@@ -5,6 +5,7 @@ import {
   Context,
 } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
+import { HuntAttribute } from '../enums';
 import { getPlayerHunt } from '../helpers';
 import { CustomAuthorizerContext } from '../interfaces';
 import { createError } from '../utils';
@@ -33,7 +34,9 @@ export const handler = async (
   let hunt: DynamoDB.DocumentClient.GetItemOutput;
   try {
     // call appropriate method depending on if hunt type is provided
-    hunt = await getPlayerHunt(playerID, huntID);
+    hunt = await getPlayerHunt(playerID, huntID, [
+      HuntAttribute.PLAYER_LOCATIONS,
+    ]);
   } catch (err) {
     return createError(err);
   }
