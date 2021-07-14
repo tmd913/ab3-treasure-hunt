@@ -9,6 +9,7 @@ import * as cloudfront from '@aws-cdk/aws-cloudfront';
 import * as iam from '@aws-cdk/aws-iam';
 import * as cognito from '@aws-cdk/aws-cognito';
 import * as dynamodb from '@aws-cdk/aws-dynamodb';
+import * as location from '@aws-cdk/aws-location';
 import { ProjectionType, TableEncryption } from '@aws-cdk/aws-dynamodb';
 import { Duration } from '@aws-cdk/core';
 
@@ -17,8 +18,31 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     super(scope, id, props);
 
     // ============================================================
+    // Amazon Location Service Map
+    // ============================================================
+
+    const map = new location.CfnMap(this, 'Map', {
+      mapName: id + 'TreasureMap',
+      pricingPlan: 'RequestBasedUsage',
+      description: 'Map used to for treasure hunts',
+      configuration: {
+        style: 'VectorEsriStreets',
+      },
+    });
+
+    // ============================================================
     // Cognito User Pool
     // ============================================================
+
+    const postConfirmationHandler = new lambdaNode.NodejsFunction(
+      this,
+      'postConfirmationHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        entry: path.join(__dirname, '../cognito/postConfirmation/index.ts'),
+        memorySize: 512,
+      }
+    );
 
     const userPool = new cognito.UserPool(this, id + 'Pool', {
       signInAliases: {
@@ -43,29 +67,27 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       },
       signInCaseSensitive: false,
       selfSignUpEnabled: true,
+      lambdaTriggers: {
+        postConfirmation: postConfirmationHandler,
+      },
     });
 
-    new cognito.CfnUserPoolGroup(this, 'PlayersGroup', {
-      groupName: 'Players',
-      userPoolId: userPool.userPoolId,
-    });
+    const cognitoAccess = new iam.PolicyStatement();
+    cognitoAccess.addActions('cognito-idp:AdminAddUserToGroup');
+    cognitoAccess.addResources(userPool.userPoolArn);
 
-    new cognito.CfnUserPoolGroup(this, 'AdminsGroup', {
-      groupName: 'Admins',
-      userPoolId: userPool.userPoolId,
-    });
-
-    new cognito.CfnUserPoolGroup(this, 'DevsGroup', {
-      groupName: 'Devs',
-      userPoolId: userPool.userPoolId,
-    });
+    // workaround to avoid circular dependency between user pool and post confirmation lambda
+    postConfirmationHandler.role?.attachInlinePolicy(
+      new iam.Policy(this, 'UserPoolPolicy', {
+        statements: [cognitoAccess],
+      })
+    );
 
     const userPoolClient = new cognito.UserPoolClient(this, id + 'PoolClient', {
       userPool,
       supportedIdentityProviders: [
         cognito.UserPoolClientIdentityProvider.COGNITO,
       ],
-      userPoolClientName: 'Web',
       authFlows: {
         userSrp: true,
       },
@@ -77,14 +99,16 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
           cognito.OAuthScope.EMAIL,
           cognito.OAuthScope.OPENID,
           cognito.OAuthScope.PROFILE,
+          cognito.OAuthScope.COGNITO_ADMIN,
         ],
         callbackUrls: ['http://localhost:3000'],
         logoutUrls: ['http://localhost:3000'],
       },
       generateSecret: false,
       refreshTokenValidity: Duration.days(30),
-      accessTokenValidity: Duration.hours(12),
-      idTokenValidity: Duration.hours(12),
+      accessTokenValidity: Duration.hours(1),
+      idTokenValidity: Duration.hours(1),
+      preventUserExistenceErrors: true,
     });
 
     const userPoolDomain = new cognito.UserPoolDomain(
@@ -92,11 +116,139 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       id + 'UserPoolDomain',
       {
         cognitoDomain: {
-          domainPrefix: 'ab3-treasure-hunt',
+          domainPrefix: 'ab3-treasure-hunt-sgc',
         },
         userPool,
       }
     );
+
+    const identityPool = new cognito.CfnIdentityPool(
+      this,
+      id + 'IdentityPool',
+      {
+        allowUnauthenticatedIdentities: false,
+        cognitoIdentityProviders: [
+          {
+            clientId: userPoolClient.userPoolClientId,
+            providerName: userPool.userPoolProviderName,
+          },
+        ],
+        allowClassicFlow: false,
+      }
+    );
+
+    const defaultIdentityStatement = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'mobileanalytics:PutEvents',
+        'cognito-sync:*',
+        'cognito-identity:*',
+      ],
+      resources: ['*'],
+    });
+
+    const authPrincipal = new iam.FederatedPrincipal(
+      'cognito-identity.amazonaws.com',
+      {
+        StringEquals: {
+          'cognito-identity.amazonaws.com:aud': identityPool.ref,
+        },
+        'ForAnyValue:StringLike': {
+          'cognito-identity.amazonaws.com:amr': 'authenticated',
+        },
+      },
+      'sts:AssumeRoleWithWebIdentity'
+    );
+
+    const defaultAuthCognitoRole = new iam.Role(this, 'DefaultAuthRole', {
+      description: 'Default authenticated role',
+      assumedBy: authPrincipal,
+      inlinePolicies: {
+        defaultAuthPolicy: new iam.PolicyDocument({
+          statements: [defaultIdentityStatement],
+        }),
+      },
+    });
+
+    const defaultUnauthCognitoRole = new iam.Role(this, 'DefaultUnauthRole', {
+      description: 'Default unauthenticated role',
+      assumedBy: new iam.FederatedPrincipal(
+        'cognito-identity.amazonaws.com',
+        {
+          StringEquals: {
+            'cognito-identity.amazonaws.com:aud': identityPool.ref,
+          },
+          'ForAnyValue:StringLike': {
+            'cognito-identity.amazonaws.com:amr': 'unauthenticated',
+          },
+        },
+        'sts:AssumeRoleWithWebIdentity'
+      ),
+      inlinePolicies: {
+        defaultUnauthPolicy: new iam.PolicyDocument({
+          statements: [defaultIdentityStatement],
+        }),
+      },
+    });
+
+    const mapAccessRole = new iam.Role(this, 'MapRole', {
+      description: 'Role to access Treasure Map',
+      assumedBy: authPrincipal,
+      inlinePolicies: {
+        mapAccessPolicy: new iam.PolicyDocument({
+          statements: [
+            defaultIdentityStatement,
+            new iam.PolicyStatement({
+              sid: 'MapsReadOnly',
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'geo:GetMapStyleDescriptor',
+                'geo:GetMapGlyphs',
+                'geo:GetMapSprites',
+                'geo:GetMapTile',
+              ],
+              resources: [map.attrArn],
+            }),
+          ],
+        }),
+      },
+    });
+
+    new cognito.CfnIdentityPoolRoleAttachment(
+      this,
+      id + 'IdentityPoolRoleAttachment',
+      {
+        identityPoolId: identityPool.ref,
+        roles: {
+          authenticated: defaultAuthCognitoRole.roleArn,
+          unauthenticated: defaultUnauthCognitoRole.roleArn,
+        },
+        roleMappings: {
+          mapping: {
+            type: 'Token',
+            ambiguousRoleResolution: 'AuthenticatedRole',
+            identityProvider: `${userPool.userPoolProviderName}:${userPoolClient.userPoolClientId}`,
+          },
+        },
+      }
+    );
+
+    new cognito.CfnUserPoolGroup(this, 'PlayersGroup', {
+      groupName: 'Players',
+      userPoolId: userPool.userPoolId,
+      roleArn: mapAccessRole.roleArn,
+    });
+
+    new cognito.CfnUserPoolGroup(this, 'AdminsGroup', {
+      groupName: 'Admins',
+      userPoolId: userPool.userPoolId,
+      roleArn: mapAccessRole.roleArn,
+    });
+
+    new cognito.CfnUserPoolGroup(this, 'DevsGroup', {
+      groupName: 'Devs',
+      userPoolId: userPool.userPoolId,
+    });
 
     // ============================================================
     // DynamoDB Tables
@@ -404,6 +556,10 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     // Outputs
     // ============================================================
 
+    new cdk.CfnOutput(this, 'mapName', {
+      value: map.mapName,
+    });
+
     new cdk.CfnOutput(this, 'distributionDomainName', {
       value: distribution.distributionDomainName,
     });
@@ -412,15 +568,19 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       value: apiGateway.url,
     });
 
-    new cdk.CfnOutput(this, 'cognitoUserPoolId', {
+    new cdk.CfnOutput(this, 'userPoolId', {
       value: userPool.userPoolId,
     });
 
-    new cdk.CfnOutput(this, 'cognitoUserPoolClientId', {
+    new cdk.CfnOutput(this, 'userPoolClientId', {
       value: userPoolClient.userPoolClientId,
     });
 
-    new cdk.CfnOutput(this, 'cognitoUserPoolDomain', {
+    new cdk.CfnOutput(this, 'identityPoolId', {
+      value: identityPool.ref,
+    });
+
+    new cdk.CfnOutput(this, 'domain', {
       value: userPoolDomain.domainName,
     });
   }
