@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
-import { Map } from '../components/Map';
+import Map from '../components/Map';
 
-export const Game = () => {
+const Game = () => {
   const { huntID } = useParams<{ huntID: string }>();
 
   return (
@@ -11,3 +11,5 @@ export const Game = () => {
     </>
   );
 };
+
+export default Game;

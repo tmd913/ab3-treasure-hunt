@@ -1,9 +1,9 @@
 import React from 'react';
-import { Redirect, Route } from 'react-router';
-import { useAuth } from '../auth/use-auth';
-import { NotAuthorized } from '../pages/NotAuthorized';
+import { Route } from 'react-router';
+import { AuthContext, useAuth } from '../auth/use-auth';
+import NotAuthorized from '../pages/NotAuthorized';
 
-export const PrivateRoute = ({
+const PrivateRoute = ({
   children,
   allowedGroups,
   ...rest
@@ -21,9 +21,14 @@ export const PrivateRoute = ({
     return allowedGroups.some((group) => userGroups.includes(group));
   };
 
+  const hasAllAuthProps = (auth: AuthContext): boolean => {
+    return auth.user && auth.userGroups && auth.jwtToken && auth.credentials;
+  };
+
   return (
     <Route {...rest}>
-      {auth.user && hasRequiredGroup(allowedGroups, auth.userGroups) ? (
+      {hasAllAuthProps(auth) &&
+      hasRequiredGroup(allowedGroups, auth.userGroups) ? (
         children
       ) : (
         <NotAuthorized></NotAuthorized>
@@ -31,3 +36,5 @@ export const PrivateRoute = ({
     </Route>
   );
 };
+
+export default PrivateRoute;

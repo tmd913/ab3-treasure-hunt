@@ -4,15 +4,19 @@ import { Auth, Hub } from 'aws-amplify';
 import { ICredentials } from '@aws-amplify/core';
 import { CognitoUser } from '@aws-amplify/auth';
 
-const authContext = createContext<{
+export interface AuthContext {
   user?: CognitoUser | any;
   userGroups?: string[];
+  jwtToken?: string;
   credentials?: ICredentials;
   signIn: () => void;
   signOut: () => void;
-}>({
+}
+
+const authContext = createContext<AuthContext>({
   user: undefined,
   userGroups: undefined,
+  jwtToken: undefined,
   credentials: undefined,
   signIn: () => {},
   signOut: () => {},
@@ -20,10 +24,10 @@ const authContext = createContext<{
 
 // Provider component that wraps your app and makes auth object ...
 // ... available to any child component that calls useAuth().
-export function ProvideAuth({ children }: React.PropsWithChildren<any>) {
+export const ProvideAuth = ({ children }: React.PropsWithChildren<any>) => {
   const auth = useProvideAuth();
   return <authContext.Provider value={auth}>{children}</authContext.Provider>;
-}
+};
 
 // Hook for child components to get the auth object ...
 // ... and re-render when it changes.
@@ -32,10 +36,11 @@ export const useAuth = () => {
 };
 
 // Provider hook that creates auth object and handles state
-function useProvideAuth() {
+const useProvideAuth = () => {
   const [user, setUser] = useState<CognitoUser | undefined>();
   const [userGroups, setUserGroups] = useState<string[] | undefined>([]);
   const [credentials, setCredentials] = useState<ICredentials | undefined>();
+  const [jwtToken, setJwtToken] = useState<string | undefined>();
 
   useEffect(() => {
     const fetchCredentials = async () => {
@@ -77,12 +82,13 @@ function useProvideAuth() {
    */
   const handleAuthStateChange = async (): Promise<void> => {
     const user = await Auth.currentAuthenticatedUser();
-    const userGroups = (await Auth.currentSession()).getIdToken().payload[
-      'cognito:groups'
-    ];
+    const idToken = (await Auth.currentSession()).getIdToken();
+    const userGroups = idToken.payload['cognito:groups'];
+    const jwtToken = idToken.getJwtToken();
     const credentials = await Auth.currentUserCredentials();
     setUser(user);
     setUserGroups(userGroups);
+    setJwtToken(jwtToken);
     setCredentials(credentials);
   };
 
@@ -90,8 +96,9 @@ function useProvideAuth() {
   return {
     user,
     userGroups,
+    jwtToken,
     credentials,
     signIn,
     signOut,
   };
-}
+};

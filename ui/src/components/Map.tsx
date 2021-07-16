@@ -20,7 +20,7 @@ const geolocateStyle = {
 const positionOptions = { enableHighAccuracy: true };
 const flyToInterpolator = new FlyToInterpolator();
 
-export const Map = () => {
+const Map = () => {
   const auth = useAuth();
 
   const [transformRequest, setRequestTransformer] = useState<Function>();
@@ -158,6 +158,5 @@ export const Map = () => {
     </>
   );
 };
-function useProvideAuth() {
-  throw new Error('Function not implemented.');
-}
+
+export default Map;
