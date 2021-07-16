@@ -1,5 +1,5 @@
 import { calculateDistance } from '.';
-import { Location } from '../interfaces';
+import { Location } from '../shared/interfaces';
 
 test('distance between points', () => {
   const playerLocation: Location = {

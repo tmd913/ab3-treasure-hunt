@@ -4,7 +4,8 @@ import {
   Context,
 } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
-import { HuntAttribute, HuntType } from '../enums';
+import { HuntAttribute, HuntType } from '../shared/enums';
+import { LambdaResponse } from '../shared/classes/LambdaResponse';
 import { createError } from '../utils';
 
 const docClient = new DynamoDB.DocumentClient();
@@ -118,10 +119,7 @@ export const handler = async (
     };
   }
 
-  return {
-    body: JSON.stringify(returnBody),
-    statusCode: 200,
-  };
+  return new LambdaResponse(200, returnBody);
 };
 
 /**

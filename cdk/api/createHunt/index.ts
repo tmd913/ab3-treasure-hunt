@@ -6,8 +6,9 @@ import {
 import { DynamoDB } from 'aws-sdk';
 import { createError, isInvalidLocation } from '../utils';
 import { v4 as uuidv4 } from 'uuid';
-import { HuntType } from '../enums';
-import { CreateHuntBody } from '../interfaces';
+import { HuntType } from '../shared/enums';
+import { CreateHuntBody } from '../shared/interfaces';
+import { LambdaResponse } from '../shared/classes/LambdaResponse';
 
 const docClient = new DynamoDB.DocumentClient();
 
@@ -45,10 +46,7 @@ export const handler = async (
     return createError(err);
   }
 
-  return {
-    body: JSON.stringify({ message: 'Treasure Hunt Created' }),
-    statusCode: 201,
-  };
+  return new LambdaResponse(201, { message: 'Treasure Hunt Created' });
 };
 
 /**

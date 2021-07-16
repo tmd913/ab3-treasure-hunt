@@ -1,6 +1,6 @@
 import { APIGatewayProxyResult } from 'aws-lambda';
 import { AWSError } from 'aws-sdk';
-import { Location } from '../interfaces';
+import { Location } from '../shared/interfaces';
 
 /**
  * Create API Gateway Error Object

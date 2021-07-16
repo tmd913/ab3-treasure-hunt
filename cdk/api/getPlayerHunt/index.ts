@@ -5,9 +5,10 @@ import {
   Context,
 } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
-import { HuntAttribute } from '../enums';
+import { HuntAttribute } from '../shared/enums';
 import { getPlayerHunt } from '../helpers';
-import { CustomAuthorizerContext } from '../interfaces';
+import { LambdaResponse } from '../shared/classes/LambdaResponse';
+import { CustomAuthorizerContext } from '../shared/interfaces';
 import { createError } from '../utils';
 
 export const handler = async (
@@ -41,10 +42,7 @@ export const handler = async (
     return createError(err);
   }
 
-  return {
-    body: JSON.stringify({
-      item: hunt.Item,
-    }),
-    statusCode: 200,
-  };
+  return new LambdaResponse(200, {
+    item: hunt.Item,
+  });
 };

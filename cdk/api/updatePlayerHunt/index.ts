@@ -5,9 +5,9 @@ import {
   Context,
 } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
-import { HuntAttribute, HuntType } from '../enums';
+import { HuntAttribute, HuntType } from '../shared/enums';
 import { getPlayerHunt } from '../helpers';
-import { CustomAuthorizerContext, Location } from '../interfaces';
+import { CustomAuthorizerContext, Location } from '../shared/interfaces';
 import { createError, isInvalidLocation } from '../utils';
 
 const docClient = new DynamoDB.DocumentClient();

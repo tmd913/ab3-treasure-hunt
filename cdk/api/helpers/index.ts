@@ -1,5 +1,5 @@
 import { DynamoDB } from 'aws-sdk';
-import { HuntAttribute } from '../enums';
+import { HuntAttribute } from '../shared/enums';
 
 const docClient = new DynamoDB.DocumentClient();
 
