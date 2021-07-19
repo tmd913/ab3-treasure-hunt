@@ -1,6 +1,5 @@
 import {
   Box,
-  Button,
   Card,
   CardActions,
   CardContent,
@@ -8,8 +7,6 @@ import {
   Typography,
 } from '@material-ui/core';
 import { PropsWithChildren } from 'react';
-import { Link } from 'react-router-dom';
-import { toTitleCase } from '../utils';
 
 const useStyles = makeStyles({
   root: {
@@ -23,8 +20,13 @@ const useStyles = makeStyles({
 export default function Hunt({
   children,
   hunt,
-  type,
-}: PropsWithChildren<{ hunt: any; type: string }>) {
+  timestampText,
+  timestampField,
+}: PropsWithChildren<{
+  hunt: any;
+  timestampText: string;
+  timestampField: string;
+}>) {
   const classes = useStyles();
 
   return (
@@ -37,19 +39,13 @@ export default function Hunt({
       >
         <CardContent>
           <Typography className={classes.title} color="textSecondary">
-            {toTitleCase(type)} hunt at:
+            {timestampText}:
           </Typography>
           <Typography component="h2">
-            {new Date(hunt?.CreatedAt).toLocaleString()}
+            {new Date(hunt[timestampField]).toLocaleString()}
           </Typography>
         </CardContent>
-        <CardActions>
-          <Link to={`/games/${hunt?.HuntID}`}>
-            <Button variant="contained" color="primary" disableElevation>
-              Start Hunt
-            </Button>
-          </Link>
-        </CardActions>
+        <CardActions>{children}</CardActions>
       </Box>
     </Card>
   );

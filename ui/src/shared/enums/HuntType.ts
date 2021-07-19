@@ -1,0 +1,8 @@
+export enum HuntType {
+  CREATED = 'CREATED',
+  ACCEPTED = 'ACCEPTED',
+  DENIED = 'DENIED',
+  STARTED = 'STARTED',
+  STOPPED = 'STOPPED',
+  COMPLETED = 'COMPLETED',
+}

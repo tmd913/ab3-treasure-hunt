@@ -1,3 +1,8 @@
+html,
+body {
+  height: 100%;
+}
+
 .goto-user {
   display: flex;
   justify-content: center;
