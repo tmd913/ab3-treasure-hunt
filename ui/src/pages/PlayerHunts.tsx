@@ -1,4 +1,4 @@
-import { Box, List, makeStyles } from '@material-ui/core';
+import { Box, List, makeStyles, Typography } from '@material-ui/core';
 import { createStyles } from '@material-ui/styles';
 import { ReactElement } from 'react';
 import { useEffect, useState } from 'react';
@@ -9,12 +9,14 @@ import Hunt from '../components/Hunt';
 import { useQuery } from '../utils';
 import LinkButton from '../components/LinkButton';
 import FunctionButton from '../components/FunctionButton';
-import HuntInfoLink from '../shared/classes/HuntInfoLink';
-import HuntInfoFunction from '../shared/classes/HuntInfoFunction';
-import HuntInfo, { ButtonType } from '../shared/classes/HuntInfo';
+import HuntCardConfig from '../shared/classes/HuntCardConfig';
 import { HuntType } from '../shared/enums/HuntType';
 import HuntTypeTabs from '../components/HuntTypeTabs';
 import { updatePlayerHunt } from '../api/updatePlayerHunt';
+import LinkButtonConfig from '../shared/classes/LinkButtonConfig';
+import FunctionButtonConfig from '../shared/classes/FunctionButtonConfig';
+import ButtonConfig, { ButtonType } from '../shared/classes/ButtonConfig';
+import Skeleton from '@material-ui/lab/Skeleton';
 
 const useStyles = makeStyles(() =>
   createStyles({
@@ -38,6 +40,12 @@ const useStyles = makeStyles(() =>
       bottom: 0,
       width: '100%',
     },
+    skeleton: {
+      borderRadius: 4,
+    },
+    noHuntsText: {
+      padding: '1rem',
+    },
   })
 );
 
@@ -48,8 +56,9 @@ export default function PlayerHunts() {
 
   const [type, setType] = useState<HuntType>();
   const [hunts, setHunts] = useState<any>();
-  const [huntInfo, setHuntInfo] = useState<HuntInfo>();
+  const [huntCardConfig, setHuntCardConfig] = useState<HuntCardConfig>();
   const [tabValue, setTabValue] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const type = query.get('type')?.toUpperCase() as HuntType;
@@ -68,58 +77,63 @@ export default function PlayerHunts() {
   useEffect(() => {
     setHunts([]);
 
+    const gameUrl = '/games/:game';
+
     switch (type) {
       case HuntType.STARTED:
         setTabValue(0);
-        setHuntInfo(
-          new HuntInfoLink(
-            'Started Hunts',
-            'Started at',
-            'StartedAt',
-            'Resume',
-            '/games/:game'
-          )
+        setHuntCardConfig(
+          new HuntCardConfig('Started Hunts', 'Started at', 'StartedAt', [
+            new LinkButtonConfig('Resume', 'primary', gameUrl),
+          ])
         );
         break;
       case HuntType.ACCEPTED:
         setTabValue(1);
-        setHuntInfo(
-          new HuntInfoLink(
-            'Accepted Hunts',
-            'Accepted at',
-            'AcceptedAt',
-            'Start',
-            '/games/:game',
-            (huntID: string) => {
-              updateHunt(huntID, HuntType.STARTED);
-            }
-          )
+        setHuntCardConfig(
+          new HuntCardConfig('Accepted Hunts', 'Accepted at', 'AcceptedAt', [
+            new LinkButtonConfig(
+              'Start',
+              'primary',
+              gameUrl,
+              (huntID: string) => {
+                updateHunt(huntID, HuntType.STARTED);
+              }
+            ),
+          ])
         );
         break;
       case HuntType.CREATED:
         setTabValue(2);
-        setHuntInfo(
-          new HuntInfoFunction(
-            'Hunt Invites',
-            'Invited at',
-            'CreatedAt',
-            'Accept',
-            async (huntID: string) => {
-              await updateHunt(huntID, HuntType.ACCEPTED);
-              getAndSetHunts();
-            }
-          )
+        setHuntCardConfig(
+          new HuntCardConfig('Hunt Invites', 'Invited at', 'CreatedAt', [
+            new FunctionButtonConfig(
+              'Accept',
+              'primary',
+              async (huntID: string) => {
+                await updateHunt(huntID, HuntType.ACCEPTED);
+                getAndSetHunts();
+              }
+            ),
+            new FunctionButtonConfig(
+              'Deny',
+              'secondary',
+              async (huntID: string) => {
+                await updateHunt(huntID, HuntType.DENIED);
+                getAndSetHunts();
+              }
+            ),
+          ])
         );
         break;
       case HuntType.COMPLETED:
         setTabValue(3);
-        setHuntInfo(
-          new HuntInfoFunction(
+        setHuntCardConfig(
+          new HuntCardConfig(
             'Discovered Treasure',
             'Discovered at',
             'CompletedAt',
-            'Details',
-            () => {}
+            [new FunctionButtonConfig('Details', 'primary', () => {})]
           )
         );
         break;
@@ -135,7 +149,9 @@ export default function PlayerHunts() {
       return [];
     }
 
-    return await getPlayerHunts(
+    setIsLoading(true);
+
+    const hunts = await getPlayerHunts(
       ApiNames.TREASURE_HUNT,
       `/players/${auth.user.getUsername()}/hunts?type=${type}`,
       {
@@ -145,6 +161,10 @@ export default function PlayerHunts() {
         },
       }
     );
+
+    setIsLoading(false);
+
+    return hunts;
   };
 
   const updateHunt = async (huntID: string, type: HuntType): Promise<void> => {
@@ -163,29 +183,37 @@ export default function PlayerHunts() {
     );
   };
 
-  const renderButton = (huntID: string): ReactElement => {
-    switch (huntInfo?.buttonType) {
+  const renderButton = (
+    huntID: string,
+    key: string,
+    buttonConfig: ButtonConfig
+  ): ReactElement => {
+    switch (buttonConfig.type) {
       case ButtonType.LINK:
-        let huntInfoLink = huntInfo as HuntInfoLink;
+        const linkButtonConfig = buttonConfig as LinkButtonConfig;
         return (
           <LinkButton
+            key={key}
             huntID={huntID}
-            text={huntInfoLink.buttonText}
-            link={huntInfoLink.createURL({
+            text={linkButtonConfig.text}
+            color={linkButtonConfig.color}
+            link={linkButtonConfig.createURL({
               pathParams: {
                 game: huntID,
               },
             })}
-            onClickHandler={huntInfoLink.onClickHandler}
+            onClickHandler={linkButtonConfig.onClickHandler}
           ></LinkButton>
         );
       case ButtonType.FUNCTION:
-        let huntInfoFunction = huntInfo as HuntInfoFunction;
+        const functionButtonConfig = buttonConfig as FunctionButtonConfig;
         return (
           <FunctionButton
+            key={key}
             huntID={huntID}
-            text={huntInfoFunction.buttonText}
-            onClickHandler={huntInfoFunction.onClickHandler}
+            text={functionButtonConfig.text}
+            color={functionButtonConfig.color}
+            onClickHandler={functionButtonConfig.onClickHandler}
           ></FunctionButton>
         );
       default:
@@ -197,10 +225,10 @@ export default function PlayerHunts() {
     <>
       <Box className={classes.mainContentContainer}>
         <Box className={classes.mainContent}>
-          <h2 className={classes.title}>{huntInfo?.title}</h2>
-          {type && hunts?.items?.length > 0 && huntInfo && (
-            <List>
-              {hunts?.items?.map((item: any, index: number) => {
+          <h2 className={classes.title}>{huntCardConfig?.title}</h2>
+          <List>
+            {type && hunts?.items?.length > 0 && huntCardConfig ? (
+              hunts.items.map((item: any, index: number) => {
                 const isLastItem = index === hunts.items.length - 1;
                 return (
                   <Box
@@ -209,16 +237,37 @@ export default function PlayerHunts() {
                   >
                     <Hunt
                       hunt={item}
-                      timestampText={huntInfo.timestampText}
-                      timestampField={huntInfo.timestampField}
+                      timestampText={huntCardConfig.timestampText}
+                      timestampField={huntCardConfig.timestampField}
                     >
-                      {renderButton(item.HuntID)}
+                      {huntCardConfig?.buttonConfigs.map(
+                        (buttonConfig, index) =>
+                          renderButton(
+                            item.HuntID,
+                            item.HuntID + '#' + index,
+                            buttonConfig
+                          )
+                      )}
                     </Hunt>
                   </Box>
                 );
-              })}
-            </List>
-          )}
+              })
+            ) : isLoading ? (
+              [0, 1, 2].map((i) => (
+                <Box marginBottom={i < 2 ? '1rem' : '0'} key={'skeleton#' + i}>
+                  <Skeleton
+                    className={classes.skeleton}
+                    variant="rect"
+                    height={77}
+                  />
+                </Box>
+              ))
+            ) : (
+              <Typography className={classes.noHuntsText}>
+                No {huntCardConfig?.title?.toLowerCase()}
+              </Typography>
+            )}
+          </List>
         </Box>
       </Box>
 

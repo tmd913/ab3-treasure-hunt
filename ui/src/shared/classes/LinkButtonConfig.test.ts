@@ -1,8 +1,8 @@
-import HuntInfoLink from './HuntInfoLink';
+import LinkButtonConfig from './LinkButtonConfig';
 
-test('create link', () => {
+test('create link button info', () => {
   expect(
-    new HuntInfoLink('', '', '', '', '/games/:game').createURL({
+    new LinkButtonConfig('', 'primary', '/games/:game').createURL({
       pathParams: {
         game: 'hunt123',
       },

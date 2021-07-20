@@ -1,4 +1,5 @@
-import HuntInfo, { ButtonType } from './HuntInfo';
+import { PropTypes } from '@material-ui/core';
+import ButtonConfig, { ButtonType } from './ButtonConfig';
 
 export interface LinkConfig {
   pathParams?: {
@@ -9,16 +10,14 @@ export interface LinkConfig {
   };
 }
 
-export default class HuntInfoLink extends HuntInfo {
+export default class LinkButtonConfig extends ButtonConfig {
   constructor(
-    title: string,
-    timestampText: string,
-    timestampField: string,
-    buttonText: string,
+    text: string,
+    color: PropTypes.Color,
     public url: string,
     public onClickHandler?: Function
   ) {
-    super(title, timestampText, timestampField, ButtonType.LINK, buttonText);
+    super(ButtonType.LINK, text, color);
   }
 
   createURL({ pathParams, queryParams }: LinkConfig): string {

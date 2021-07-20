@@ -1,15 +1,17 @@
-import { Button } from '@material-ui/core';
+import { Button, PropTypes } from '@material-ui/core';
 import { PropsWithChildren } from 'react';
-import { Link, useHistory } from 'react-router-dom';
+import { useHistory } from 'react-router-dom';
 
 export default function LinkButton({
   huntID,
   text,
+  color,
   link,
   onClickHandler,
 }: PropsWithChildren<{
   huntID: string;
   text: string;
+  color: PropTypes.Color;
   link: string;
   onClickHandler?: Function;
 }>) {
@@ -27,7 +29,7 @@ export default function LinkButton({
     <>
       <Button
         variant="contained"
-        color="primary"
+        color={color}
         disableElevation
         onClick={() => handleClick(huntID)}
       >
