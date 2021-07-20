@@ -13,6 +13,35 @@ import ReactMapGL, {
 import amplifyConfig from '../amplify-config';
 import { environment } from '../environment';
 import { useAuth } from '../auth/use-auth';
+import {
+  Button,
+  createStyles,
+  Link,
+  makeStyles,
+  Theme,
+} from '@material-ui/core';
+import HomeIcon from '@material-ui/icons/Home';
+import { Link as RouterLink } from 'react-router-dom';
+
+const useStyles = makeStyles((theme: Theme) =>
+  createStyles({
+    mapButton: {
+      backgroundColor: theme.palette.background.paper,
+      '&:hover': {
+        backgroundColor: theme.palette.grey[200],
+      },
+    },
+    homeButton: {
+      minWidth: 40,
+      width: 40,
+      height: 40,
+      borderRadius: '50%',
+      position: 'absolute',
+      top: 20,
+      right: 20,
+    },
+  })
+);
 
 const geolocateStyle = {
   top: 100,
@@ -22,6 +51,8 @@ const flyToInterpolator = new FlyToInterpolator();
 
 const Map = () => {
   const auth = useAuth();
+
+  const classes = useStyles();
 
   const [transformRequest, setRequestTransformer] = useState<Function>();
 
@@ -103,57 +134,69 @@ const Map = () => {
   return (
     <>
       {isMapViewable(auth.userGroups) && transformRequest && (
-        <>
-          <div className="goto-user">
-            <button className="goto-user-btn" onClick={goToDC}>
-              Washington, DC
-            </button>
-          </div>
-          <ReactMapGL
-            {...viewport}
-            width="100%"
-            height="100vh"
-            transformRequest={transformRequest}
-            mapStyle={environment.mapName}
-            onViewportChange={(viewstate: ViewState) => {
-              setViewport(viewstate);
-              setCounter(counter + 1);
-              if (counter % 10 === 0) {
-                setRotation(rotation + 10);
-              }
-            }}
-          >
-            <div style={{ position: 'absolute', left: 20, top: 20 }}>
-              <NavigationControl showCompass={true} />
-              <GeolocateControl
-                style={geolocateStyle}
-                positionOptions={positionOptions}
-                showAccuracyCircle={false}
-                trackUserLocation={false}
-                auto
-                onViewportChange={(viewstate: ViewState) => {
-                  if (!dot) {
-                    const dotEl = document.querySelector(
-                      '.mapboxgl-user-location-dot.mapboxgl-marker.mapboxgl-marker-anchor-center'
-                    );
-                    if (dotEl) {
-                      dotEl.setAttribute('style', 'text-content: center');
-                      setDot(dotEl);
-                    }
+        <ReactMapGL
+          {...viewport}
+          width="100%"
+          height="100vh"
+          style={{ position: 'absolute', top: 0 }}
+          transformRequest={transformRequest}
+          mapStyle={environment.mapName}
+          onViewportChange={(viewstate: ViewState) => {
+            setViewport(viewstate);
+            setCounter(counter + 1);
+            if (counter % 10 === 0) {
+              setRotation(rotation + 10);
+            }
+          }}
+        >
+          <div style={{ position: 'absolute', left: 20, top: 20 }}>
+            <NavigationControl showCompass={true} />
+            <GeolocateControl
+              style={geolocateStyle}
+              positionOptions={positionOptions}
+              showAccuracyCircle={false}
+              trackUserLocation={false}
+              auto
+              onViewportChange={(viewstate: ViewState) => {
+                if (!dot) {
+                  const dotEl = document.querySelector(
+                    '.mapboxgl-user-location-dot.mapboxgl-marker.mapboxgl-marker-anchor-center'
+                  );
+                  if (dotEl) {
+                    dotEl.setAttribute('style', 'text-content: center');
+                    setDot(dotEl);
                   }
+                }
 
-                  setViewport({
-                    ...viewstate,
-                    bearing: Math.random() * 360,
-                    transitionDuration: 1000,
-                    transitionInterpolator: flyToInterpolator,
-                    transitionEasing: easeCubic,
-                  });
-                }}
-              />
-            </div>
-          </ReactMapGL>
-        </>
+                setViewport({
+                  ...viewstate,
+                  bearing: Math.random() * 360,
+                  transitionDuration: 1000,
+                  transitionInterpolator: flyToInterpolator,
+                  transitionEasing: easeCubic,
+                });
+              }}
+            />
+          </div>
+          <div className="goto-user">
+            <Button
+              className={classes.mapButton + ' goto-user-btn'}
+              variant="contained"
+              size="small"
+              onClick={goToDC}
+            >
+              Washington, DC
+            </Button>
+          </div>
+          <Link component={RouterLink} to="/hunts?type=started">
+            <Button
+              variant="contained"
+              className={classes.mapButton + ' ' + classes.homeButton}
+            >
+              <HomeIcon />
+            </Button>
+          </Link>
+        </ReactMapGL>
       )}
     </>
   );

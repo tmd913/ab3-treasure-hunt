@@ -11,6 +11,14 @@ const useStyles = makeStyles((theme: Theme) => ({
   root: {
     flexGrow: 1,
     backgroundColor: theme.palette.grey[200],
+    boxShadow: `
+      -3px 0px 5px -1px rgba(0,0,0,0.2),
+      -5px 0px 8px 0px rgba(0,0,0,0.14),
+      -1px 0px 14px 0px rgba(0,0,0,0.12)
+    `,
+  },
+  tab: {
+    paddingBottom: '1rem',
   },
 }));
 
@@ -45,10 +53,22 @@ export default function HuntTypeTabs({ tabValue }: { tabValue: number }) {
       textColor="primary"
       aria-label="hunt type tabs"
     >
-      <Tab icon={<SportsEsportsIcon />} label="STARTED" />
-      <Tab icon={<CheckBoxIcon />} label="ACCEPTED" />
-      <Tab icon={<NotificationsIcon />} label="INVITES" />
-      <Tab icon={<EmojiEventsIcon />} label="TREASURE" />
+      <Tab
+        className={classes.tab}
+        icon={<SportsEsportsIcon />}
+        label="STARTED"
+      />
+      <Tab className={classes.tab} icon={<CheckBoxIcon />} label="ACCEPTED" />
+      <Tab
+        className={classes.tab}
+        icon={<NotificationsIcon />}
+        label="INVITES"
+      />
+      <Tab
+        className={classes.tab}
+        icon={<EmojiEventsIcon />}
+        label="TREASURE"
+      />
     </Tabs>
   );
 }

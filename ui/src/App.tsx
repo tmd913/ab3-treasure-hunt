@@ -2,10 +2,11 @@ import './App.css';
 import Amplify from 'aws-amplify';
 import amplifyConfig from './amplify-config';
 import {
-  BrowserRouter as Router,
   Switch,
   Route,
   Link as RouterLink,
+  useRouteMatch,
+  withRouter,
 } from 'react-router-dom';
 import AuthButton from './auth/AuthButton';
 import Home from './pages/Home';
@@ -18,14 +19,16 @@ import CreateUser from './pages/CreateUser';
 import HuntLogs from './pages/HuntLogs';
 import NotFound from './pages/NotFound';
 import {
+  AppBar,
   Box,
   createStyles,
-  createTheme,
+  unstable_createMuiStrictModeTheme as createTheme,
   CssBaseline,
   Link,
   makeStyles,
   Theme,
   ThemeProvider,
+  Toolbar,
   Typography,
 } from '@material-ui/core';
 
@@ -42,22 +45,30 @@ const useStyles = makeStyles((theme: Theme) =>
         marginLeft: theme.spacing(2),
       },
     },
+    headerNav: {
+      backgroundColor: theme.palette.grey[200],
+      boxShadow: theme.shadows[2],
+    },
   })
 );
 
-const App = () => {
+const App = withRouter(() => {
   const classes = useStyles();
+  const isGame = useRouteMatch('/games/:huntID');
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <ProvideAuth>
-        <Router>
-          <Box p={2}>
-            <AuthButton></AuthButton>
-          </Box>
-
-          <Box>
+        {!isGame && (
+          <>
+            <AppBar className={classes.headerNav} position="sticky">
+              <Toolbar>
+                <Box display="flex" justifyContent="end" width="100%">
+                  <AuthButton></AuthButton>
+                </Box>
+              </Toolbar>
+            </AppBar>
             <Box p={2}>
               <Typography className={classes.root}>
                 <Link component={RouterLink} to="/">
@@ -65,9 +76,6 @@ const App = () => {
                 </Link>
                 <Link component={RouterLink} to="/hunts?type=started">
                   Player Hunts
-                </Link>
-                <Link component={RouterLink} to="/games/hunt123">
-                  Game
                 </Link>
                 <Link component={RouterLink} to="/logs">
                   Hunt Logs
@@ -80,35 +88,36 @@ const App = () => {
                 </Link>
               </Typography>
             </Box>
-
-            <Switch>
-              <Route exact path="/">
-                <Home />
-              </Route>
-              <PrivateRoute path="/hunts" allowedGroups={['Players']}>
-                <PlayerHunts />
-              </PrivateRoute>
-              <PrivateRoute path="/games/:huntID" allowedGroups={['Players']}>
-                <Game />
-              </PrivateRoute>
-              <PrivateRoute path="/logs" allowedGroups={['Admins', 'Devs']}>
-                <HuntLogs />
-              </PrivateRoute>
-              <PrivateRoute path="/createHunt" allowedGroups={['Admins']}>
-                <CreateHunt />
-              </PrivateRoute>
-              <PrivateRoute path="/createUser" allowedGroups={['Admins']}>
-                <CreateUser />
-              </PrivateRoute>
-              <Route path="*">
-                <NotFound />
-              </Route>
-            </Switch>
-          </Box>
-        </Router>
+          </>
+        )}
+        <Box>
+          <Switch>
+            <Route exact path="/">
+              <Home />
+            </Route>
+            <PrivateRoute path="/hunts" allowedGroups={['Players']}>
+              <PlayerHunts />
+            </PrivateRoute>
+            <PrivateRoute path="/games/:huntID" allowedGroups={['Players']}>
+              <Game />
+            </PrivateRoute>
+            <PrivateRoute path="/logs" allowedGroups={['Admins', 'Devs']}>
+              <HuntLogs />
+            </PrivateRoute>
+            <PrivateRoute path="/createHunt" allowedGroups={['Admins']}>
+              <CreateHunt />
+            </PrivateRoute>
+            <PrivateRoute path="/createUser" allowedGroups={['Admins']}>
+              <CreateUser />
+            </PrivateRoute>
+            <Route path="*">
+              <NotFound />
+            </Route>
+          </Switch>
+        </Box>
       </ProvideAuth>
     </ThemeProvider>
   );
-};
+});
 
 export default App;
