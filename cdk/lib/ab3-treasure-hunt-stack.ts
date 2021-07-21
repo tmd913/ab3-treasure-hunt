@@ -409,6 +409,23 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       }
     );
 
+    const getUserHandler = new lambdaNode.NodejsFunction(
+      this,
+      'getUserHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        entry: path.join(__dirname, '../api/getUser/index.ts'),
+        memorySize: 512,
+        environment: {
+          USER_POOL_ID: userPool.userPoolId,
+        },
+      }
+    );
+    const cognitoGetUserAccess = new iam.PolicyStatement();
+    cognitoGetUserAccess.addActions('cognito-idp:AdminGetUser');
+    cognitoGetUserAccess.addResources(userPool.userPoolArn);
+    getUserHandler.addToRolePolicy(cognitoGetUserAccess);
+
     // grant read/write permission to DynamoDB tables
     playerHuntsTable.grantReadWriteData(getPlayerHuntsHandler);
     playerHuntsTable.grantReadWriteData(getPlayerHuntHandler);
@@ -456,21 +473,21 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     const playerRoute = playersRoute.addResource('{player}');
 
     // ==> /api/players/{player}/hunts
-    const playerHunts = playerRoute.addResource('hunts');
-    playerHunts.addMethod(
+    const playerHuntsRoute = playerRoute.addResource('hunts');
+    playerHuntsRoute.addMethod(
       'GET',
       new apigw.LambdaIntegration(getPlayerHuntsHandler),
       { authorizer }
     );
 
     // ==> /api/players/{player}/hunts/{hunt}
-    const playerHunt = playerHunts.addResource('{hunt}');
-    playerHunt.addMethod(
+    const playerHuntRoute = playerHuntsRoute.addResource('{hunt}');
+    playerHuntRoute.addMethod(
       'GET',
       new apigw.LambdaIntegration(getPlayerHuntHandler),
       { authorizer }
     );
-    playerHunt.addMethod(
+    playerHuntRoute.addMethod(
       'PUT',
       new apigw.LambdaIntegration(updatePlayerHuntHandler),
       { authorizer }
@@ -488,6 +505,13 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
         authorizer,
       }
     );
+
+    // ==> /api/users/{username}
+    const usersRoute = apiRoute.addResource('users');
+    const userRoute = usersRoute.addResource('{username}');
+    userRoute.addMethod('GET', new apigw.LambdaIntegration(getUserHandler), {
+      authorizer,
+    });
 
     // ============================================================
     // S3 Static Website Hosting

@@ -9,6 +9,7 @@ import { HuntAttribute, HuntType } from '../shared/enums';
 import { getPlayerHunt } from '../helpers';
 import { CustomAuthorizerContext, Location } from '../shared/interfaces';
 import { createError, isInvalidLocation } from '../utils';
+import { LambdaResponse } from '../shared/classes/LambdaResponse';
 
 const docClient = new DynamoDB.DocumentClient();
 
@@ -54,10 +55,10 @@ export const handler = async (
   if (type) {
     try {
       await updateType(playerID, huntID, type);
-      return {
-        body: JSON.stringify({ message: 'Player hunt type updated' }),
-        statusCode: 200,
-      };
+
+      return new LambdaResponse(200, {
+        message: 'Player hunt type updated',
+      });
     } catch (err) {
       return createError(err);
     }
@@ -81,23 +82,17 @@ export const handler = async (
         await updateType(playerID, huntID, HuntType.COMPLETED);
       }
 
-      return {
-        body: JSON.stringify({
-          message: isWinnerVal ? 'You win!' : 'Player location added',
-        }),
-        statusCode: 200,
-      };
+      return new LambdaResponse(200, {
+        message: isWinnerVal ? 'You win!' : 'Player location added',
+      });
     } catch (err) {
       return createError(err);
     }
   }
 
-  return {
-    body: JSON.stringify({
-      message: 'Must provide hunt type or location in request body!',
-    }),
-    statusCode: 400,
-  };
+  return new LambdaResponse(400, {
+    message: 'Must provide hunt type or location in request body!',
+  });
 };
 
 /**
