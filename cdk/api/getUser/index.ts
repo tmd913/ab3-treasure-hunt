@@ -1,5 +1,4 @@
 import {
-  PostAuthenticationTriggerEvent,
   Context,
   APIGatewayProxyEventBase,
   APIGatewayProxyEventPathParameters,

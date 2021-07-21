@@ -229,7 +229,7 @@ const Map = ({
               />
             </div>
           </ReactMapGL>
-          {isAdmin && (
+          {isAdmin && playerLocation && (
             <div className="goto-user">
               <Button
                 className={classes.mapButton + ' goto-user-btn'}

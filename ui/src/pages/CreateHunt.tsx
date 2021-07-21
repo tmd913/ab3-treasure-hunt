@@ -15,6 +15,9 @@ import { useAuth } from '../auth/use-auth';
 import { AmplifyS3ImagePicker } from '@aws-amplify/ui-react';
 import Map from '../components/Map';
 import { useState } from 'react';
+import { getUser } from '../api/getUser';
+import { searchPlaceIndex } from '../api/searchPlaceIndex';
+import { CognitoIdentityServiceProvider } from 'aws-sdk';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -25,7 +28,8 @@ const useStyles = makeStyles((theme: Theme) =>
     map: {
       flexGrow: 1,
       minWidth: 400,
-      minHeight: '70vh',
+      minHeight: '60vh',
+      marginTop: '1rem',
       boxShadow: theme.shadows[4],
     },
     mapButton: {
@@ -73,7 +77,7 @@ export default function CreateHunt() {
       triggerDistance: '',
     },
     validationSchema: validationSchema,
-    onSubmit: ({
+    onSubmit: async ({
       treasureDescription,
       playerEmail,
       latitude,
@@ -84,7 +88,7 @@ export default function CreateHunt() {
         treasureImage: 's3://url',
         treasureDescription,
         playerEmail,
-        playerID: '41e1f68e-5ad1-467b-b133-df9baef158f7',
+        playerID,
         treasureLocation: {
           latitude,
           longitude,
@@ -92,13 +96,15 @@ export default function CreateHunt() {
         triggerDistance,
       };
 
-      createHunt(ApiNames.TREASURE_HUNT, '/hunts', {
+      await createHunt(ApiNames.TREASURE_HUNT, '/hunts', {
         headers: {
           Authorization: 'Bearer ' + auth.jwtToken,
           'Content-Type': 'application/json',
         },
         body,
       });
+
+      formik.resetForm();
     },
   });
 
@@ -110,10 +116,9 @@ export default function CreateHunt() {
   const [playerLocation, setPlayerLocation] = useState<{
     latitude: number;
     longitude: number;
-  }>({
-    longitude: -77.0369,
-    latitude: 38.9072,
-  });
+  }>();
+
+  const [playerID, setPlayerID] = useState<string>();
 
   const handleMapClick = (e: any) => {
     console.log(e.lngLat);
@@ -126,20 +131,52 @@ export default function CreateHunt() {
     formik.setFieldValue('latitude', latitude);
   };
 
+  const getUserInfo = async (username: string) => {
+    const user: CognitoIdentityServiceProvider.AdminGetUserResponse =
+      await getUser(ApiNames.TREASURE_HUNT, `/users/${username}`, {
+        headers: {
+          Authorization: 'Bearer ' + auth.jwtToken,
+          'Content-Type': 'application/json',
+        },
+      });
+
+    const playerID = user.Username;
+    setPlayerID(playerID);
+
+    const zipCode =
+      user.UserAttributes?.find((attr) => attr.Name.includes('zipCode'))
+        ?.Value || '19610';
+    const playerCoords = await getCoordinatesFromZipCode(+zipCode);
+    setPlayerLocation(playerCoords);
+  };
+
+  const getCoordinatesFromZipCode = (
+    zipCode: number
+  ): Promise<{ longitude: number; latitude: number }> => {
+    return searchPlaceIndex(ApiNames.TREASURE_HUNT, `/places/${zipCode}`, {
+      headers: {
+        Authorization: 'Bearer ' + auth.jwtToken,
+        'Content-Type': 'application/json',
+      },
+    });
+  };
+
   return (
     <Box p={2}>
       <Typography className={classes.title} variant="h5" component="h2">
         Create Treasure Hunt
       </Typography>
 
-      <Box display="flex" flexWrap="wrap" justifyContent="center" p={4}>
+      <Box display="flex" flexWrap="wrap" justifyContent="center" p={2}>
         <Box
           display="flex"
           justifyContent="center"
           minWidth={950}
           padding="0 1rem"
         >
-          <AmplifyS3ImagePicker />
+          <Box marginTop="1rem" padding="0 1rem">
+            <AmplifyS3ImagePicker />
+          </Box>
 
           <Box minWidth={400} maxWidth={500} padding="0 1rem">
             <Box>
@@ -182,6 +219,15 @@ export default function CreateHunt() {
                     formik.touched.playerEmail && formik.errors.playerEmail
                   }
                 ></TextField>
+
+                <Button
+                  variant="contained"
+                  fullWidth
+                  style={{ marginBottom: '1rem' }}
+                  onClick={() => getUserInfo(formik.values.playerEmail)}
+                >
+                  Get Player Info
+                </Button>
 
                 <TextField
                   type="number"

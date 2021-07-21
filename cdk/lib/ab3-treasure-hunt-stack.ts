@@ -18,7 +18,7 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     super(scope, id, props);
 
     // ============================================================
-    // Amazon Location Service Map
+    // Amazon Location Service
     // ============================================================
 
     const map = new location.CfnMap(this, 'Map', {
@@ -28,6 +28,12 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       configuration: {
         style: 'VectorEsriStreets',
       },
+    });
+
+    const placeIndex = new location.CfnPlaceIndex(this, 'PlaceIndex', {
+      indexName: id + 'PlaceIndex',
+      pricingPlan: 'RequestBasedUsage',
+      dataSource: 'Esri',
     });
 
     // ============================================================
@@ -426,6 +432,23 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     cognitoGetUserAccess.addResources(userPool.userPoolArn);
     getUserHandler.addToRolePolicy(cognitoGetUserAccess);
 
+    const searchPlaceIndexHandler = new lambdaNode.NodejsFunction(
+      this,
+      'searchPlaceIndexHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        entry: path.join(__dirname, '../api/searchPlaceIndex/index.ts'),
+        memorySize: 512,
+        environment: {
+          PLACE_INDEX_NAME: placeIndex.indexName,
+        },
+      }
+    );
+    const placeIndexAccess = new iam.PolicyStatement();
+    placeIndexAccess.addActions('geo:SearchPlaceIndexForText');
+    placeIndexAccess.addResources(placeIndex.attrArn);
+    searchPlaceIndexHandler.addToRolePolicy(placeIndexAccess);
+
     // grant read/write permission to DynamoDB tables
     playerHuntsTable.grantReadWriteData(getPlayerHuntsHandler);
     playerHuntsTable.grantReadWriteData(getPlayerHuntHandler);
@@ -512,6 +535,17 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     userRoute.addMethod('GET', new apigw.LambdaIntegration(getUserHandler), {
       authorizer,
     });
+
+    // ==> /api/places/{zipCode}
+    const placesRoute = apiRoute.addResource('places');
+    const placeRoute = placesRoute.addResource('{zipCode}');
+    placeRoute.addMethod(
+      'GET',
+      new apigw.LambdaIntegration(searchPlaceIndexHandler),
+      {
+        authorizer,
+      }
+    );
 
     // ============================================================
     // S3 Static Website Hosting
