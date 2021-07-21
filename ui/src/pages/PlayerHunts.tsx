@@ -39,7 +39,7 @@ const useStyles = makeStyles(() =>
       padding: '0 1rem',
     },
     title: {
-      paddingLeft: '1.5rem',
+      padding: '1.5rem 0 1rem 1.5rem',
     },
     huntMarginBottom: {
       marginBottom: '1rem',
@@ -57,7 +57,7 @@ const useStyles = makeStyles(() =>
     },
     treasureDrawer: {
       width: '75vw',
-      maxWidth: 400,
+      maxWidth: 600,
     },
     treasureImage: {
       fontSize: '8rem',
@@ -293,7 +293,9 @@ export default function PlayerHunts() {
     <>
       <Box className={classes.mainContentContainer}>
         <Box className={classes.mainContent}>
-          <h2 className={classes.title}>{huntCardConfig?.title}</h2>
+          <Typography variant="h5" component="h2" className={classes.title}>
+            {huntCardConfig?.title}
+          </Typography>
           <List>
             {isLoading ? (
               [0, 1, 2].map((i) => (

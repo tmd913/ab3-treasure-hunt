@@ -64,32 +64,45 @@ const App = withRouter(() => {
           <>
             <AppBar className={classes.headerNav} position="sticky">
               <Toolbar>
-                <Box display="flex" justifyContent="end" width="100%">
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  width="100%"
+                >
+                  <Typography variant="h5" component="h1" color="textPrimary">
+                    SGC
+                  </Typography>
+
+                  <Typography className={classes.root}>
+                    <Link component={RouterLink} to="/">
+                      Home
+                    </Link>
+
+                    <Link component={RouterLink} to="/hunts?type=started">
+                      Player Hunts
+                    </Link>
+
+                    <Link component={RouterLink} to="/logs">
+                      Hunt Logs
+                    </Link>
+
+                    <Link component={RouterLink} to="/createHunt">
+                      Create Hunt
+                    </Link>
+
+                    <Link component={RouterLink} to="/createUser">
+                      Create User
+                    </Link>
+                  </Typography>
+
                   <AuthButton></AuthButton>
                 </Box>
               </Toolbar>
             </AppBar>
-            <Box p={2}>
-              <Typography className={classes.root}>
-                <Link component={RouterLink} to="/">
-                  Home
-                </Link>
-                <Link component={RouterLink} to="/hunts?type=started">
-                  Player Hunts
-                </Link>
-                <Link component={RouterLink} to="/logs">
-                  Hunt Logs
-                </Link>
-                <Link component={RouterLink} to="/createHunt">
-                  Create Hunt
-                </Link>
-                <Link component={RouterLink} to="/createUser">
-                  Create User
-                </Link>
-              </Typography>
-            </Box>
           </>
         )}
+
         <Box>
           <Switch>
             <Route exact path="/">
