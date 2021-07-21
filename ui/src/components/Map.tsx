@@ -9,22 +9,22 @@ import ReactMapGL, {
   GeolocateControl,
   NavigationControl,
   ViewportProps,
+  Marker,
 } from 'react-map-gl';
 import amplifyConfig from '../amplify-config';
 import { environment } from '../environment';
 import { useAuth } from '../auth/use-auth';
-import {
-  Button,
-  createStyles,
-  Link,
-  makeStyles,
-  Theme,
-} from '@material-ui/core';
-import HomeIcon from '@material-ui/icons/Home';
-import { Link as RouterLink } from 'react-router-dom';
+import { Button, createStyles, makeStyles, Theme } from '@material-ui/core';
+import './Map.css';
+import Pin from './Pin';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
+    mapContainer: {
+      position: 'relative',
+      width: '100%',
+      height: '100%',
+    },
     mapButton: {
       backgroundColor: theme.palette.background.paper,
       '&:hover': {
@@ -49,7 +49,21 @@ const geolocateStyle = {
 const positionOptions = { enableHighAccuracy: true };
 const flyToInterpolator = new FlyToInterpolator();
 
-const Map = () => {
+const Map = ({
+  onMapClick,
+  marker,
+  playerLocation,
+}: {
+  onMapClick?: Function;
+  marker?: {
+    latitude: number;
+    longitude: number;
+  };
+  playerLocation?: {
+    latitude: number;
+    longitude: number;
+  };
+}) => {
   const auth = useAuth();
 
   const classes = useStyles();
@@ -65,6 +79,11 @@ const Map = () => {
   const [rotation, setRotation] = useState<number>(0);
   const [dot, setDot] = useState<Element>();
   const [counter, setCounter] = useState<number>(0);
+  const [isAdmin, setIsAdmin] = useState<boolean>();
+
+  useEffect(() => {
+    setIsAdmin(auth.userGroups?.includes('Admins'));
+  }, [auth]);
 
   // create a new transformRequest function whenever the credentials change
   useEffect(() => {
@@ -81,7 +100,7 @@ const Map = () => {
     };
 
     makeRequestTransformer();
-  }, [auth.credentials]);
+  }, [auth]);
 
   useEffect(() => {
     if (dot) {
@@ -118,11 +137,19 @@ const Map = () => {
     return ['Players', 'Admins'].some((group) => groups.includes(group));
   };
 
-  const goToDC = () => {
+  const flyToPlayerLocation = () => {
+    if (
+      !playerLocation ||
+      playerLocation.latitude == null ||
+      playerLocation.longitude == null
+    ) {
+      return;
+    }
+
     setViewport({
       ...viewport,
-      longitude: -77.0369,
-      latitude: 38.9072,
+      longitude: playerLocation.longitude,
+      latitude: playerLocation.latitude,
       zoom: 14,
       bearing: 0,
       transitionDuration: 2000,
@@ -132,73 +159,91 @@ const Map = () => {
   };
 
   return (
-    <>
+    <div className={classes.mapContainer}>
       {isMapViewable(auth.userGroups) && transformRequest && (
-        <ReactMapGL
-          {...viewport}
-          width="100%"
-          height="100vh"
-          style={{ position: 'absolute', top: 0 }}
-          transformRequest={transformRequest}
-          mapStyle={environment.mapName}
-          onViewportChange={(viewstate: ViewState) => {
-            setViewport(viewstate);
-            setCounter(counter + 1);
-            if (counter % 10 === 0) {
-              setRotation(rotation + 10);
-            }
-          }}
-        >
-          <div style={{ position: 'absolute', left: 20, top: 20 }}>
-            <NavigationControl showCompass={true} />
-            <GeolocateControl
-              style={geolocateStyle}
-              positionOptions={positionOptions}
-              showAccuracyCircle={false}
-              trackUserLocation={false}
-              auto
-              onViewportChange={(viewstate: ViewState) => {
-                if (!dot) {
-                  const dotEl = document.querySelector(
-                    '.mapboxgl-user-location-dot.mapboxgl-marker.mapboxgl-marker-anchor-center'
-                  );
-                  if (dotEl) {
-                    dotEl.setAttribute('style', 'text-content: center');
-                    setDot(dotEl);
-                  }
-                }
+        <>
+          <ReactMapGL
+            {...viewport}
+            width="100%"
+            height="100%"
+            transformRequest={transformRequest}
+            mapStyle={environment.mapName}
+            onViewportChange={(viewstate: ViewState) => {
+              setViewport(viewstate);
 
-                setViewport({
-                  ...viewstate,
-                  bearing: Math.random() * 360,
-                  transitionDuration: 1000,
-                  transitionInterpolator: flyToInterpolator,
-                  transitionEasing: easeCubic,
-                });
-              }}
-            />
-          </div>
-          <div className="goto-user">
-            <Button
-              className={classes.mapButton + ' goto-user-btn'}
-              variant="contained"
-              size="small"
-              onClick={goToDC}
-            >
-              Washington, DC
-            </Button>
-          </div>
-          <Link component={RouterLink} to="/hunts?type=started">
-            <Button
-              variant="contained"
-              className={classes.mapButton + ' ' + classes.homeButton}
-            >
-              <HomeIcon />
-            </Button>
-          </Link>
-        </ReactMapGL>
+              if (!isAdmin) {
+                setCounter(counter + 1);
+                if (counter % 10 === 0) {
+                  setRotation(rotation + 10);
+                }
+              }
+            }}
+            onClick={(e: any) => {
+              if (onMapClick) {
+                onMapClick(e);
+              }
+            }}
+          >
+            {marker?.latitude && marker?.longitude && (
+              <Marker
+                longitude={marker.longitude}
+                latitude={marker.latitude}
+                offsetTop={-20}
+                offsetLeft={-10}
+              >
+                <Pin size={20} />
+              </Marker>
+            )}
+            <div style={{ position: 'absolute', left: 20, top: 20 }}>
+              <NavigationControl showCompass={true} />
+              <GeolocateControl
+                style={geolocateStyle}
+                positionOptions={positionOptions}
+                showAccuracyCircle={false}
+                trackUserLocation={false}
+                auto={!isAdmin}
+                onViewportChange={(viewstate: ViewState) => {
+                  if (isAdmin) {
+                    setViewport(viewstate);
+                    return;
+                  }
+
+                  if (!dot) {
+                    const dotEl = document.querySelector(
+                      '.mapboxgl-user-location-dot.mapboxgl-marker.mapboxgl-marker-anchor-center'
+                    );
+                    if (dotEl) {
+                      dotEl.setAttribute('style', 'text-content: center');
+                      setDot(dotEl);
+                    }
+                  }
+
+                  setViewport({
+                    ...viewstate,
+                    bearing: Math.random() * 360,
+                    transitionDuration: 1000,
+                    transitionInterpolator: flyToInterpolator,
+                    transitionEasing: easeCubic,
+                  });
+                }}
+              />
+            </div>
+          </ReactMapGL>
+          {isAdmin && (
+            <div className="goto-user">
+              <Button
+                className={classes.mapButton + ' goto-user-btn'}
+                variant="contained"
+                size="small"
+                onClick={flyToPlayerLocation}
+              >
+                Fly to Player Location
+              </Button>
+            </div>
+          )}
+        </>
       )}
-    </>
+    </div>
   );
 };
 
