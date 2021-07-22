@@ -279,20 +279,21 @@ export const calculateDistance = (
  */
 const degToRad = (deg: number) => (deg * Math.PI) / 180;
 
-/**
- * [x] 1. Check for hunts table env var
- * 2. Check for type body property
- *    [x] a. If present
- *       [x] 1. Check validity and update DB item
- *       [x] 2. Add "hunt type updated" message to returned body
- *    b. Else
- *       1. Check for location property
- *          a. If present
- *             [x] 1. Check validity and update item
- *             2. Compare to treasure location
- *                a. If within trigger distance
- *                   1. Update hunt type to COMPLETED
- *                   2. Add win message and treasure info to returned body
- *                [x] b. Else, add "location added" message to returned body
- *          [x] b. Else, return error
- */
+export const calculateBearing = (
+  startLocation: Location,
+  endLocation: Location
+): number => {
+  const startLat = degToRad(endLocation.latitude);
+  const startLong = degToRad(endLocation.longitude);
+  const endLat = degToRad(startLocation.latitude);
+  const endLong = degToRad(startLocation.longitude);
+  const y = Math.sin(endLong - startLong) * Math.cos(endLat);
+  const x =
+    Math.cos(startLat) * Math.sin(endLat) -
+    Math.sin(startLat) * Math.cos(endLat) * Math.cos(endLong - startLong);
+  const initialBearingRad = Math.atan2(y, x);
+  const initialBearing = ((initialBearingRad * 180) / Math.PI + 360) % 360; // in degrees
+  const finalBearing = (initialBearing + 180) % 360;
+
+  return Math.round(finalBearing);
+};

@@ -1,4 +1,4 @@
-import { calculateDistance } from '.';
+import { calculateBearing, calculateDistance } from '.';
 import { Location } from '../shared/interfaces';
 
 test('distance between points', () => {
@@ -12,4 +12,17 @@ test('distance between points', () => {
   };
 
   expect(calculateDistance(playerLocation, treasureLocation)).toEqual(1322);
+});
+
+test('bearing between points', () => {
+  const start = {
+    latitude: 50,
+    longitude: 50,
+  };
+  const end = {
+    latitude: 50,
+    longitude: 55,
+  };
+
+  expect(calculateBearing(start, end)).toEqual(92);
 });
