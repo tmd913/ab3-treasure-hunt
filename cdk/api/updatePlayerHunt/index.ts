@@ -76,15 +76,13 @@ export const handler = async (
     try {
       await addLocation(playerID, huntID, location);
 
-      const isWinnerVal = await isWinner(playerID, huntID, location);
+      const gameResponse = await createResponse(playerID, huntID, location);
 
-      if (isWinnerVal) {
+      if (gameResponse.isWinner) {
         await updateType(playerID, huntID, HuntType.COMPLETED);
       }
 
-      return new LambdaResponse(200, {
-        message: isWinnerVal ? 'You win!' : 'Player location added',
-      });
+      return new LambdaResponse(200, gameResponse);
     } catch (err) {
       return createError(err);
     }
@@ -206,17 +204,21 @@ const addLocation = async (
 /**
  * Determines if the player has won by checking if the distance between
  * their current location and the treasure location is less than the
- * trigger distance
+ * trigger distance. Returns that value along with distance and bearing metrics
  * @param playerID Player ID
  * @param huntID Hunt ID
  * @param location Player Location
- * @returns Boolean stating if player has won
+ * @returns Response with game metrics
  */
-const isWinner = async (
+const createResponse = async (
   playerID: string,
   huntID: string,
   location: Location
-): Promise<boolean> => {
+): Promise<{
+  isWinner: boolean;
+  treasureBearing: number;
+  treasureDistance: number;
+}> => {
   // get treasure location and trigger distance
   const { Item: hunt } = await getPlayerHunt(playerID, huntID, [
     HuntAttribute.TREASURE_LOCATION,
@@ -232,13 +234,18 @@ const isWinner = async (
 
   if (treasureLocation == null || triggerDistance == null) {
     throw new Error(
-      'Cannot determine win without both treasure location and trigger distance attributes!'
+      'Treasure location and trigger distance are required attributes!'
     );
   }
 
-  const distance = calculateDistance(location, treasureLocation);
+  const treasureDistance = calculateDistance(location, treasureLocation);
+  const treasureBearing = calculateBearing(location, treasureLocation);
 
-  return distance < triggerDistance;
+  return {
+    isWinner: treasureDistance < triggerDistance,
+    treasureBearing,
+    treasureDistance,
+  };
 };
 
 /**
@@ -279,6 +286,12 @@ export const calculateDistance = (
  */
 const degToRad = (deg: number) => (deg * Math.PI) / 180;
 
+/**
+ * Calculate final bearing (direction) after traveling between points
+ * @param startLocation Start location in degrees
+ * @param endLocation End location in degrees
+ * @returns Final bearing
+ */
 export const calculateBearing = (
   startLocation: Location,
   endLocation: Location
