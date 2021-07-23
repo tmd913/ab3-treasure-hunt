@@ -54,7 +54,6 @@ const useProvideAuth = () => {
 
   useEffect(() => {
     Hub.listen('auth', async ({ payload: { event, data } }) => {
-      console.log(event);
       switch (event) {
         case 'signIn':
         case 'signOut':

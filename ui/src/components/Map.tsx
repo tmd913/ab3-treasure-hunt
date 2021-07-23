@@ -84,6 +84,7 @@ const Map = ({
   geojson,
   handleLocationChange,
   createMockLocation,
+  isWinner,
 }: {
   onMapClick?: Function;
   marker?: {
@@ -97,6 +98,7 @@ const Map = ({
   geojson?: GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties>;
   handleLocationChange?: Function;
   createMockLocation?: Function;
+  isWinner?: boolean;
 }) => {
   const auth = useAuth();
 
@@ -111,6 +113,7 @@ const Map = ({
   });
 
   const [heading, setHeading] = useState<number>();
+  const [treasureBearing, setTreasureBearing] = useState<number>();
   const [rotation, setRotation] = useState<number>(0);
   const [dot, setDot] = useState<Element>();
   const [current, setCurrent] = useState<Element>();
@@ -118,6 +121,8 @@ const Map = ({
   const [isAdmin, setIsAdmin] = useState<boolean>();
   const [data, setData] =
     useState<GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties>>();
+  const [geoUpdateInProgress, setGeoUpdateInProgress] =
+    useState<boolean>(false);
 
   useEffect(() => {
     if (!geojson) {
@@ -238,189 +243,215 @@ const Map = ({
     return Math.round(finalBearing);
   };
 
+  const handleGeolocationChange = async (viewstate: ViewState) => {
+    if (geoUpdateInProgress) {
+      return;
+    }
+
+    // admin does not need game functionality
+    if (
+      isAdmin ||
+      !handleLocationChange ||
+      !createMockLocation ||
+      !data ||
+      isWinner
+    ) {
+      setViewport(viewstate);
+      return;
+    }
+
+    setGeoUpdateInProgress(true);
+
+    // store element in order to render custom arrow icon
+    if (!current) {
+      const currentEl = document.querySelector('.current');
+      if (currentEl) {
+        currentEl.setAttribute('style', 'text-content: center');
+        setCurrent(currentEl);
+      }
+    }
+
+    // get previous location
+    const coordinates = data?.geometry.coordinates;
+    const len = coordinates.length;
+    const startLocation: [number, number] = (coordinates[len - 1] || [
+      -77.1, 38.9,
+    ]) as [number, number];
+
+    const isMock = false;
+
+    const endLocation = isMock
+      ? createMockLocation(startLocation)
+      : [viewstate.longitude, viewstate.latitude];
+
+    const gameResponse = await handleLocationChange(endLocation);
+    setTreasureBearing(gameResponse.treasureBearing);
+
+    const [endLongitude, endLatitude]: [number, number] = endLocation;
+    const [startLongitude, startLatitude]: [number, number] = startLocation;
+
+    const endLoc = {
+      longitude: endLongitude,
+      latitude: endLatitude,
+    };
+    const startLoc = {
+      longitude: startLongitude,
+      latitude: startLatitude,
+    };
+
+    // store direction player is heading
+    const bearing = calculateBearing(startLoc, endLoc);
+    setHeading(bearing);
+
+    setViewport({
+      ...viewstate,
+      longitude: endLongitude,
+      latitude: endLatitude,
+      bearing,
+      transitionDuration: 1000,
+      transitionInterpolator: flyToInterpolator,
+      transitionEasing: easeCubic,
+    });
+
+    setGeoUpdateInProgress(false);
+  };
+
   return (
     <div className={classes.mapContainer}>
-      {isMapViewable(auth.userGroups) && transformRequest && (
-        <>
-          <ReactMapGL
-            {...viewport}
-            width="100%"
-            height="100%"
-            transformRequest={transformRequest}
-            mapStyle={environment.mapName}
-            onViewportChange={(viewstate: ViewState) => {
-              setViewport(viewstate);
+      {isMapViewable(auth.userGroups) &&
+        transformRequest &&
+        (geojson || isAdmin) && (
+          <>
+            <ReactMapGL
+              {...viewport}
+              width="100%"
+              height="100%"
+              transformRequest={transformRequest}
+              mapStyle={environment.mapName}
+              onViewportChange={(viewstate: ViewState) => {
+                setViewport(viewstate);
 
-              // if (!isAdmin) {
-              //   setCounter(counter + 1);
-              //   if (counter % 10 === 0) {
-              //     setRotation(rotation + 10);
-              //   }
-              // }
+                // if (!isAdmin) {
+                //   setCounter(counter + 1);
+                //   if (counter % 10 === 0) {
+                //     setRotation(rotation + 10);
+                //   }
+                // }
 
-              setRotation(viewstate?.bearing || 0);
-            }}
-            onClick={(e: any) => {
-              if (onMapClick) {
-                onMapClick(e);
-              }
-            }}
-          >
-            <Source id="my-data" type="geojson" data={data}>
-              <Layer {...layerStyle} source="my-data" />
-            </Source>
-
-            <Marker
-              longitude={
-                geojson?.geometry.coordinates[
-                  geojson.geometry.coordinates.length - 1
-                ][0] || 0
-              }
-              latitude={
-                geojson?.geometry.coordinates[
-                  geojson.geometry.coordinates.length - 1
-                ][1] || 0
-              }
-              offsetTop={-20}
-              offsetLeft={-25}
+                setRotation(viewstate?.bearing || 0);
+              }}
+              onClick={(e: any) => {
+                if (onMapClick) {
+                  onMapClick(e);
+                }
+              }}
             >
-              <div className="current">
-                <div
-                  className="radar-container"
-                  style={{
-                    transform: `rotate(${
-                      ((heading || 0) - rotation + BASE_ROTATION) % 360
-                    }deg`,
-                  }}
+              <Source id="my-data" type="geojson" data={data}>
+                <Layer {...layerStyle} source="my-data" />
+              </Source>
+
+              {geojson &&
+                geojson.geometry &&
+                geojson.geometry.coordinates?.length > 0 && (
+                  <>
+                    <Marker
+                      longitude={
+                        geojson?.geometry.coordinates[
+                          geojson.geometry.coordinates.length - 1
+                        ][0] || 0
+                      }
+                      latitude={
+                        geojson?.geometry.coordinates[
+                          geojson.geometry.coordinates.length - 1
+                        ][1] || 0
+                      }
+                      offsetTop={-20}
+                      offsetLeft={-25}
+                    >
+                      <div className="current">
+                        <div
+                          className="radar-container"
+                          style={{
+                            transform: `rotate(${
+                              ((treasureBearing || 0) -
+                                rotation +
+                                BASE_ROTATION) %
+                              360
+                            }deg`,
+                          }}
+                        >
+                          <svg
+                            className="radar"
+                            height="20"
+                            width="20"
+                            viewBox="0 0 20 20"
+                          >
+                            <circle
+                              r="5"
+                              cx="50%"
+                              cy="50%"
+                              fill="transparent"
+                              stroke="rgba(235, 29, 29, 0.66)"
+                              strokeWidth="10"
+                              strokeDasharray="3.925 27.475"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                      <ArrowUpwardIcon
+                        id="arrowIcon"
+                        className={classes.arrowIcon}
+                      />
+                    </Marker>
+
+                    <Marker
+                      longitude={geojson?.geometry.coordinates[0][0] || 0}
+                      latitude={geojson?.geometry.coordinates[0][1] || 0}
+                      offsetTop={-20}
+                      offsetLeft={-10}
+                    >
+                      <HomeIcon className={classes.homeIcon} />
+                    </Marker>
+                  </>
+                )}
+
+              {marker?.latitude && marker?.longitude && (
+                <Marker
+                  longitude={marker.longitude}
+                  latitude={marker.latitude}
+                  offsetTop={-20}
+                  offsetLeft={-10}
                 >
-                  <svg
-                    className="radar"
-                    height="20"
-                    width="20"
-                    viewBox="0 0 20 20"
-                  >
-                    <circle
-                      r="5"
-                      cx="50%"
-                      cy="50%"
-                      fill="transparent"
-                      stroke="rgba(235, 29, 29, 0.66)"
-                      strokeWidth="10"
-                      strokeDasharray="3.925 27.475"
-                    />
-                  </svg>
-                </div>
+                  <Pin size={20} />
+                </Marker>
+              )}
+
+              <div style={{ position: 'absolute', left: 25, top: 80 }}>
+                <NavigationControl showCompass={true} />
+                <GeolocateControl
+                  style={geolocateStyle}
+                  positionOptions={positionOptions}
+                  showAccuracyCircle={false}
+                  trackUserLocation={true}
+                  auto={!isAdmin}
+                  onViewportChange={handleGeolocationChange}
+                />
               </div>
-              <ArrowUpwardIcon id="arrowIcon" className={classes.arrowIcon} />
-            </Marker>
-
-            <Marker
-              longitude={geojson?.geometry.coordinates[0][0] || 0}
-              latitude={geojson?.geometry.coordinates[0][1] || 0}
-              offsetTop={-20}
-              offsetLeft={-10}
-            >
-              <HomeIcon className={classes.homeIcon} />
-            </Marker>
-
-            {marker?.latitude && marker?.longitude && (
-              <Marker
-                longitude={marker.longitude}
-                latitude={marker.latitude}
-                offsetTop={-20}
-                offsetLeft={-10}
-              >
-                <Pin size={20} />
-              </Marker>
+            </ReactMapGL>
+            {isAdmin && playerLocation && (
+              <div className="goto-user">
+                <Button
+                  className={classes.mapButton + ' goto-user-btn'}
+                  variant="contained"
+                  size="small"
+                  onClick={flyToPlayerLocation}
+                >
+                  Fly to Player Location
+                </Button>
+              </div>
             )}
-
-            <div style={{ position: 'absolute', left: 25, top: 80 }}>
-              <NavigationControl showCompass={true} />
-              <GeolocateControl
-                style={geolocateStyle}
-                positionOptions={positionOptions}
-                showAccuracyCircle={false}
-                trackUserLocation={true}
-                auto={!isAdmin}
-                onViewportChange={(viewstate: ViewState) => {
-                  if (isAdmin) {
-                    setViewport(viewstate);
-                    return;
-                  }
-
-                  if (!current) {
-                    const currentEl = document.querySelector('.current');
-                    if (currentEl) {
-                      currentEl.setAttribute('style', 'text-content: center');
-                      setCurrent(currentEl);
-                    }
-                  }
-
-                  if (!createMockLocation || !handleLocationChange) {
-                    setViewport({
-                      ...viewstate,
-                      bearing: Math.random() * 360,
-                      transitionDuration: 1000,
-                      transitionInterpolator: flyToInterpolator,
-                      transitionEasing: easeCubic,
-                    });
-                    return;
-                  }
-
-                  const coordinates = data?.geometry.coordinates || [];
-                  const len = coordinates.length;
-                  const startLocation: [number, number] = (coordinates[
-                    len - 1
-                  ] || [0, 0]) as [number, number];
-                  const endLocation =
-                    len > 0 ? createMockLocation(startLocation) : [0, 0];
-
-                  handleLocationChange(endLocation);
-
-                  const [endLongitude, endLatitude]: [number, number] =
-                    endLocation;
-                  const [startLongitude, startLatitude]: [number, number] =
-                    startLocation;
-
-                  const endLoc = {
-                    longitude: endLongitude,
-                    latitude: endLatitude,
-                  };
-                  const startLoc = {
-                    longitude: startLongitude,
-                    latitude: startLatitude,
-                  };
-
-                  const bearing = calculateBearing(startLoc, endLoc);
-                  setHeading(bearing);
-
-                  setViewport({
-                    ...viewstate,
-                    longitude: endLongitude,
-                    latitude: endLatitude,
-                    bearing,
-                    transitionDuration: 1000,
-                    transitionInterpolator: flyToInterpolator,
-                    transitionEasing: easeCubic,
-                  });
-                }}
-              />
-            </div>
-          </ReactMapGL>
-          {isAdmin && playerLocation && (
-            <div className="goto-user">
-              <Button
-                className={classes.mapButton + ' goto-user-btn'}
-                variant="contained"
-                size="small"
-                onClick={flyToPlayerLocation}
-              >
-                Fly to Player Location
-              </Button>
-            </div>
-          )}
-        </>
-      )}
+          </>
+        )}
     </div>
   );
 };

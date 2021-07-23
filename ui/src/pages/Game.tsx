@@ -10,9 +10,14 @@ import {
 } from '@material-ui/core';
 import Map from '../components/Map';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router-dom';
 import { useState } from 'react';
 import { useEffect } from 'react';
+import { getPlayerHunt } from '../api/getPlayerHunt';
+import { ApiNames } from '../api/ApiNames.enum';
+import { useAuth } from '../auth/use-auth';
+import Location from '../shared/interfaces/Location';
+import { updatePlayerHunt } from '../api/updatePlayerHunt';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -41,40 +46,126 @@ const useStyles = makeStyles((theme: Theme) =>
 );
 
 const Game = () => {
+  const auth = useAuth();
   const classes = useStyles();
-  // const { huntID } = useParams<{ huntID: string }>();
+  const { huntID } = useParams<{ huntID: string }>();
 
-  const [geojson, setGeojson] = useState<
-    GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties>
-  >({
-    type: 'Feature',
-    properties: {},
-    geometry: {
-      type: 'LineString',
-      coordinates: [[-77.0547, 38.9024]],
-    },
-  });
+  const [geojson, setGeojson] =
+    useState<GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties>>();
+  const [isWinner, setIsWinner] = useState<boolean>(false);
 
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     const coordinates: GeoJSON.Position[] = geojson.geometry.coordinates;
-  //     const len = coordinates.length;
-  //     const nextLocation = createMockLocation(coordinates[len - 1]);
-  //     coordinates.push(nextLocation);
+  useEffect(() => {
+    const getExistingLocations = async () => {
+      const locations = await getLocations(auth.user.getUsername(), huntID);
 
-  //     const replacement: GeoJSON.Feature<
-  //       GeoJSON.LineString,
-  //       GeoJSON.GeoJsonProperties
-  //     > = {
-  //       ...geojson,
-  //       ...{ geometry: { type: 'LineString', coordinates } },
-  //     };
+      const defaultGeojson: GeoJSON.Feature<
+        GeoJSON.LineString,
+        GeoJSON.GeoJsonProperties
+      > = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: [],
+        },
+      };
 
-  //     setGeojson(Object.assign({}, replacement));
-  //   }, 5000);
+      setGeojson(buildGeojson(locations, defaultGeojson));
+    };
 
-  //   setTimeout(() => clearInterval(interval), 60000);
-  // }, []);
+    getExistingLocations();
+  }, []);
+
+  useEffect(() => {
+    if (isWinner) {
+      console.log('you win!');
+    }
+  }, [isWinner]);
+
+  const getLocations = async (
+    playerID: string,
+    huntID: string
+  ): Promise<[number, number][]> => {
+    const hunt = await getPlayerHunt(
+      ApiNames.TREASURE_HUNT,
+      `/players/${playerID}/hunts/${huntID}`,
+      {
+        headers: {
+          Authorization: 'Bearer ' + auth.jwtToken,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return hunt.item.PlayerLocations.length === 0
+      ? []
+      : hunt.item.PlayerLocations.map((location: Location) => [
+          location.longitude,
+          location.latitude,
+        ]);
+  };
+
+  const addLocation = async (
+    playerID: string,
+    huntID: string,
+    location: { longitude: number; latitude: number }
+  ): Promise<{
+    isWinner: boolean;
+    treasureBearing: number;
+    treasureDistance: number;
+  }> => {
+    const updateResponse = await updatePlayerHunt(
+      ApiNames.TREASURE_HUNT,
+      `/players/${playerID}/hunts/${huntID}`,
+      {
+        headers: {
+          Authorization: 'Bearer ' + auth.jwtToken,
+          'Content-Type': 'application/json',
+        },
+        body: {
+          location,
+        },
+      }
+    );
+
+    console.log(updateResponse);
+
+    if (updateResponse.isWinner) {
+      setIsWinner(true);
+    }
+
+    return updateResponse;
+  };
+
+  const handleLocationChange = async (newLocation: GeoJSON.Position) => {
+    if (!geojson) {
+      return {};
+    }
+
+    const gameResponse = await addLocation(auth.user.getUsername(), huntID, {
+      longitude: newLocation[0],
+      latitude: newLocation[1],
+    });
+
+    setGeojson(Object.assign({}, buildGeojson([newLocation], geojson)));
+
+    return gameResponse;
+  };
+
+  const buildGeojson = (
+    newLocations: GeoJSON.Position[],
+    geojson: GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties>
+  ): GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties> => {
+    const coordinates: GeoJSON.Position[] = [
+      ...geojson.geometry.coordinates,
+      ...newLocations,
+    ];
+
+    return {
+      ...geojson,
+      ...{ geometry: { type: 'LineString', coordinates } },
+    };
+  };
 
   const createMockLocation = (
     previousLocation: GeoJSON.Position
@@ -90,41 +181,14 @@ const Game = () => {
     return [nextLong, nextLat];
   };
 
-  const getLocations = (
-    playerID: string,
-    huntID: string
-  ): [number, number][] => {
-    return [];
-  };
-
-  const addLocation = async (
-    playerID: string,
-    huntID: string,
-    location: { longitude: number; latitude: number }
-  ): Promise<void> => {};
-
   return (
     <>
       <Box className={classes.map}>
         <Map
           geojson={geojson}
-          handleLocationChange={(newLocation: GeoJSON.Position) => {
-            const coordinates: GeoJSON.Position[] =
-              geojson.geometry.coordinates;
-            const nextLocation = newLocation;
-            coordinates.push(nextLocation);
-
-            const replacement: GeoJSON.Feature<
-              GeoJSON.LineString,
-              GeoJSON.GeoJsonProperties
-            > = {
-              ...geojson,
-              ...{ geometry: { type: 'LineString', coordinates } },
-            };
-
-            setGeojson(Object.assign({}, replacement));
-          }}
+          handleLocationChange={handleLocationChange}
           createMockLocation={createMockLocation}
+          isWinner={isWinner}
         ></Map>
       </Box>
 
