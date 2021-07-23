@@ -14,8 +14,8 @@
 
 .radar-container {
   position: absolute;
-  top: calc((100vh) / 2 * -1 + 7.5px);
-  left: calc((100vw) / 2 * -1 + 7.5px);
+  top: calc((100vh) / 2 * -1 + 25px);
+  left: calc((100vw) / 2 * -1 + 25px);
   width: 100vw;
   height: 100vh;
   display: flex;

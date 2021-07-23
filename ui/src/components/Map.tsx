@@ -37,16 +37,20 @@ const useStyles = makeStyles((theme: Theme) =>
       },
     },
     homeIcon: {
+      width: 40,
+      height: 40,
       backgroundColor: theme.palette.background.paper,
-      boxShadow: theme.shadows[5],
+      boxShadow: theme.shadows[10],
       borderRadius: 4,
     },
     arrowIcon: {
-      width: 30,
-      height: 30,
-      backgroundColor: theme.palette.background.paper,
-      boxShadow: theme.shadows[5],
+      width: 50,
+      height: 50,
+      backgroundColor: theme.palette.primary.main,
+      color: theme.palette.background.paper,
+      boxShadow: theme.shadows[10],
       borderRadius: '50%',
+      zIndex: 100,
     },
   })
 );
@@ -63,7 +67,7 @@ const layerStyle: LayerProps = {
     'line-cap': 'round',
   },
   paint: {
-    'line-color': '#007cbf',
+    'line-color': '#3f51b5',
     'line-width': 8,
   },
 };
@@ -107,7 +111,7 @@ const Map = ({
   });
 
   const [heading, setHeading] = useState<number>();
-  const [rotation, setRotation] = useState<number>(BASE_ROTATION);
+  const [rotation, setRotation] = useState<number>(0);
   const [dot, setDot] = useState<Element>();
   const [current, setCurrent] = useState<Element>();
   const [counter, setCounter] = useState<number>(0);
@@ -157,66 +161,20 @@ const Map = ({
     makeRequestTransformer();
   }, [auth]);
 
-  // useEffect(() => {
-  //   if (dot) {
-  //     const div = (
-  //       <div className="radar-container">
-  //         <svg
-  //           className="radar"
-  //           height="20"
-  //           width="20"
-  //           viewBox="0 0 20 20"
-  //           transform={`rotate(${rotation})`}
-  //         >
-  //           <circle
-  //             r="5"
-  //             cx="50%"
-  //             cy="50%"
-  //             fill="transparent"
-  //             stroke="rgba(235, 29, 29, 0.66)"
-  //             strokeWidth="10"
-  //             strokeDasharray="3.925 27.475"
-  //           />
-  //         </svg>
-  //       </div>
-  //     );
-  //     ReactDOM.render(div, dot);
-  //   }
-  // }, [dot, rotation]);
-
-  // useEffect(() => {
-  //   if (current) {
-  //     const div = (
-  //       <div className="radar-container">
-  //         <svg
-  //           className="radar"
-  //           height="20"
-  //           width="20"
-  //           viewBox="0 0 20 20"
-  //           transform={`rotate(${rotation})`}
-  //         >
-  //           <circle
-  //             r="5"
-  //             cx="50%"
-  //             cy="50%"
-  //             fill="transparent"
-  //             stroke="rgba(235, 29, 29, 0.66)"
-  //             strokeWidth="10"
-  //             strokeDasharray="3.925 27.475"
-  //           />
-  //         </svg>
-  //       </div>
-  //     );
-  //     ReactDOM.render(div, current);
-  //   }
-  // }, [current, rotation]);
+  useEffect(() => {
+    document
+      .querySelector(
+        '.mapboxgl-user-location-dot.mapboxgl-marker.mapboxgl-marker-anchor-center'
+      )
+      ?.setAttribute('style', 'display: none');
+  }, [current]);
 
   useEffect(() => {
     document
       .querySelector('#arrowIcon')
       ?.setAttribute(
         'style',
-        `transform: rotate(${rotation - BASE_ROTATION}deg)`
+        `transform: rotate(${(heading || 0) - rotation}deg)`
       );
   }, [current, rotation]);
 
@@ -299,18 +257,8 @@ const Map = ({
               //     setRotation(rotation + 10);
               //   }
               // }
-              // console.log(viewstate.bearing);
 
-              // setRotation(
-              //   viewstate.bearing
-              //     ? BASE_ROTATION - viewstate.bearing
-              //     : BASE_ROTATION
-              // );
-              setRotation(
-                heading
-                  ? (BASE_ROTATION - (viewstate?.bearing || 0) + heading) % 360
-                  : BASE_ROTATION
-              );
+              setRotation(viewstate?.bearing || 0);
             }}
             onClick={(e: any) => {
               if (onMapClick) {
@@ -334,9 +282,35 @@ const Map = ({
                 ][1] || 0
               }
               offsetTop={-20}
-              offsetLeft={-10}
+              offsetLeft={-25}
             >
-              <div className="current"></div>
+              <div className="current">
+                <div
+                  className="radar-container"
+                  style={{
+                    transform: `rotate(${
+                      ((heading || 0) - rotation + BASE_ROTATION) % 360
+                    }deg`,
+                  }}
+                >
+                  <svg
+                    className="radar"
+                    height="20"
+                    width="20"
+                    viewBox="0 0 20 20"
+                  >
+                    <circle
+                      r="5"
+                      cx="50%"
+                      cy="50%"
+                      fill="transparent"
+                      stroke="rgba(235, 29, 29, 0.66)"
+                      strokeWidth="10"
+                      strokeDasharray="3.925 27.475"
+                    />
+                  </svg>
+                </div>
+              </div>
               <ArrowUpwardIcon id="arrowIcon" className={classes.arrowIcon} />
             </Marker>
 
@@ -374,21 +348,11 @@ const Map = ({
                     return;
                   }
 
-                  // if (!dot) {
-                  //   const dotEl = document.querySelector(
-                  //     '.mapboxgl-user-location-dot.mapboxgl-marker.mapboxgl-marker-anchor-center'
-                  //   );
-                  //   if (dotEl) {
-                  //     dotEl.setAttribute('style', 'text-content: center');
-                  //     setDot(dotEl);
-                  //   }
-                  // }
-
                   if (!current) {
                     const currentEl = document.querySelector('.current');
                     if (currentEl) {
                       currentEl.setAttribute('style', 'text-content: center');
-                      setDot(currentEl);
+                      setCurrent(currentEl);
                     }
                   }
 
