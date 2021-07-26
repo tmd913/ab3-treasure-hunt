@@ -18,6 +18,14 @@ interface UpdateHuntBody {
   location: Location;
 }
 
+interface GameResponse {
+  isWinner: boolean;
+  treasureImage: string;
+  treasureDescription: string;
+  treasureBearing: number;
+  treasureDistance: number;
+}
+
 export const handler = async (
   event: APIGatewayProxyEventBase<CustomAuthorizerContext>,
   _context: Context
@@ -214,14 +222,12 @@ const createResponse = async (
   playerID: string,
   huntID: string,
   location: Location
-): Promise<{
-  isWinner: boolean;
-  treasureBearing: number;
-  treasureDistance: number;
-}> => {
+): Promise<GameResponse> => {
   // get treasure location and trigger distance
   const { Item: hunt } = await getPlayerHunt(playerID, huntID, [
     HuntAttribute.TREASURE_LOCATION,
+    HuntAttribute.TREASURE_IMAGE,
+    HuntAttribute.TREASURE_DESCRIPTION,
     HuntAttribute.TRIGGER_DISTANCE,
   ]);
 
@@ -230,6 +236,8 @@ const createResponse = async (
   }
 
   const treasureLocation = hunt[HuntAttribute.TREASURE_LOCATION];
+  const treasureImage = hunt[HuntAttribute.TREASURE_IMAGE];
+  const treasureDescription = hunt[HuntAttribute.TREASURE_DESCRIPTION];
   const triggerDistance = hunt[HuntAttribute.TRIGGER_DISTANCE];
 
   if (treasureLocation == null || triggerDistance == null) {
@@ -243,6 +251,8 @@ const createResponse = async (
 
   return {
     isWinner: treasureDistance < triggerDistance,
+    treasureImage,
+    treasureDescription,
     treasureBearing,
     treasureDistance,
   };

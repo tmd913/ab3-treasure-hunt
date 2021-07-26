@@ -3,10 +3,16 @@ import {
   Box,
   Button,
   createStyles,
-  IconButton,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Link,
   makeStyles,
+  Slide,
   Theme,
+  Typography,
 } from '@material-ui/core';
 import Map from '../components/Map';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
@@ -18,6 +24,10 @@ import { ApiNames } from '../api/ApiNames.enum';
 import { useAuth } from '../auth/use-auth';
 import Location from '../shared/interfaces/Location';
 import { updatePlayerHunt } from '../api/updatePlayerHunt';
+import confetti from 'canvas-confetti';
+import React from 'react';
+import { TransitionProps } from '@material-ui/core/transitions';
+import GameResponse from '../shared/interfaces/GameResponse';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -42,8 +52,31 @@ const useStyles = makeStyles((theme: Theme) =>
       top: 20,
       left: 20,
     },
+    distanceContainer: {
+      position: 'absolute',
+      top: 20,
+      width: '100%',
+      display: 'flex',
+      justifyContent: 'center',
+      pointerEvents: 'none',
+    },
+    distance: {
+      backgroundColor: theme.palette.primary.main,
+      color: theme.palette.background.paper,
+      boxShadow: theme.shadows[2],
+      padding: '0.25rem 0.75rem',
+      borderRadius: 4,
+      zIndex: 99,
+    },
   })
 );
+
+const Transition = React.forwardRef(function Transition(
+  props: TransitionProps & { children?: React.ReactElement<any, any> },
+  ref: React.Ref<unknown>
+) {
+  return <Slide direction="up" ref={ref} {...props} />;
+});
 
 const Game = () => {
   const auth = useAuth();
@@ -53,6 +86,9 @@ const Game = () => {
   const [geojson, setGeojson] =
     useState<GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties>>();
   const [isWinner, setIsWinner] = useState<boolean>(false);
+  const [treasureDistance, setTreasureDistance] = useState<number>();
+  const [treasureDescription, setTreasureDescription] = useState<string>();
+  const [open, setOpen] = React.useState(false);
 
   useEffect(() => {
     const getExistingLocations = async () => {
@@ -77,10 +113,95 @@ const Game = () => {
   }, []);
 
   useEffect(() => {
+    // setTimeout(() => {
+    //   setIsWinner(true);
+    //   setTreasureDescription('This is treasure');
+    // }, 5000);
+
     if (isWinner) {
-      console.log('you win!');
+      setOpen(true);
+      setTimeout(() => {
+        celebrate();
+      }, 300);
+      setTimeout(() => {
+        fireworks();
+      }, 600);
     }
   }, [isWinner]);
+
+  const fireworks = () => {
+    var duration = 3000;
+    var animationEnd = Date.now() + duration;
+    var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+    const randomInRange = (min: number, max: number) => {
+      return Math.random() * (max - min) + min;
+    };
+
+    const interval: NodeJS.Timeout = setInterval(function () {
+      var timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      var particleCount = 50 * (timeLeft / duration);
+      // since particles fall down, start a bit higher than random
+      confetti(
+        Object.assign({}, defaults, {
+          particleCount,
+          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+          zIndex: 9999,
+        })
+      );
+      confetti(
+        Object.assign({}, defaults, {
+          particleCount,
+          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+          zIndex: 9999,
+        })
+      );
+    }, 250);
+  };
+
+  const celebrate = () => {
+    const count = 200;
+    const defaults = {
+      origin: { y: 0.7 },
+    };
+
+    const fire = (particleRatio: number, opts: any) => {
+      confetti(
+        Object.assign({}, defaults, opts, {
+          particleCount: Math.floor(count * particleRatio),
+          zIndex: 9999,
+        })
+      );
+    };
+
+    fire(0.25, {
+      spread: 26,
+      startVelocity: 55,
+    });
+    fire(0.2, {
+      spread: 60,
+    });
+    fire(0.35, {
+      spread: 100,
+      decay: 0.91,
+      scalar: 0.8,
+    });
+    fire(0.1, {
+      spread: 120,
+      startVelocity: 25,
+      decay: 0.92,
+      scalar: 1.2,
+    });
+    fire(0.1, {
+      spread: 120,
+      startVelocity: 45,
+    });
+  };
 
   const getLocations = async (
     playerID: string,
@@ -109,12 +230,8 @@ const Game = () => {
     playerID: string,
     huntID: string,
     location: { longitude: number; latitude: number }
-  ): Promise<{
-    isWinner: boolean;
-    treasureBearing: number;
-    treasureDistance: number;
-  }> => {
-    const updateResponse = await updatePlayerHunt(
+  ): Promise<GameResponse> => {
+    const gameResponse: GameResponse = await updatePlayerHunt(
       ApiNames.TREASURE_HUNT,
       `/players/${playerID}/hunts/${huntID}`,
       {
@@ -128,13 +245,15 @@ const Game = () => {
       }
     );
 
-    console.log(updateResponse);
+    console.log(gameResponse);
+    setTreasureDistance(gameResponse.treasureDistance);
 
-    if (updateResponse.isWinner) {
+    if (gameResponse.isWinner) {
       setIsWinner(true);
+      setTreasureDescription(gameResponse.treasureDescription);
     }
 
-    return updateResponse;
+    return gameResponse;
   };
 
   const handleLocationChange = async (newLocation: GeoJSON.Position) => {
@@ -181,6 +300,10 @@ const Game = () => {
     return [nextLong, nextLat];
   };
 
+  const handleClose = () => {
+    setOpen(false);
+  };
+
   return (
     <>
       <Box className={classes.map}>
@@ -200,6 +323,49 @@ const Game = () => {
           <ArrowBackIcon />
         </Button>
       </Link>
+
+      {treasureDistance && (
+        <Box className={classes.distanceContainer}>
+          <Typography variant="h6" component="h2" className={classes.distance}>
+            {treasureDistance.toLocaleString()} meters away
+          </Typography>
+        </Box>
+      )}
+
+      <Dialog
+        open={open}
+        TransitionComponent={Transition}
+        keepMounted
+        onClose={handleClose}
+        aria-labelledby="alert-dialog-slide-title"
+        aria-describedby="alert-dialog-slide-description"
+      >
+        <DialogTitle id="alert-dialog-slide-title">{'You win!'}</DialogTitle>
+        <DialogContent style={{ minWidth: 300, minHeight: 300 }}>
+          <DialogContentText id="alert-dialog-slide-description">
+            {treasureDescription}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            variant="contained"
+            disableElevation
+            color="primary"
+            component={RouterLink}
+            to="/hunts?type=completed"
+          >
+            Explore Treasure
+          </Button>
+          <Button
+            onClick={handleClose}
+            variant="contained"
+            disableElevation
+            color="secondary"
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

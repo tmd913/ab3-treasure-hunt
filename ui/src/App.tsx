@@ -31,6 +31,7 @@ import {
   Toolbar,
   Typography,
 } from '@material-ui/core';
+import BugReportIcon from '@material-ui/icons/BugReport';
 
 Amplify.configure(amplifyConfig);
 
@@ -46,7 +47,7 @@ const useStyles = makeStyles((theme: Theme) =>
       },
     },
     headerNav: {
-      backgroundColor: theme.palette.grey[200],
+      backgroundColor: theme.palette.primary.main,
       boxShadow: theme.shadows[2],
     },
   })
@@ -63,18 +64,24 @@ const App = withRouter(() => {
         {!isGame && (
           <>
             <AppBar className={classes.headerNav} position="sticky">
-              <Toolbar>
+              <Toolbar style={{ color: 'white' }}>
                 <Box
                   display="flex"
                   justifyContent="space-between"
                   alignItems="center"
                   width="100%"
                 >
-                  <Typography variant="h5" component="h1" color="textPrimary">
+                  <Typography variant="h5" component="h1">
+                    <BugReportIcon
+                      style={{
+                        fontSize: '1.75rem',
+                        verticalAlign: 'top',
+                      }}
+                    />
                     SGC
                   </Typography>
 
-                  <Typography className={classes.root}>
+                  {/* <Typography className={classes.root}>
                     <Link component={RouterLink} to="/">
                       Home
                     </Link>
@@ -94,7 +101,7 @@ const App = withRouter(() => {
                     <Link component={RouterLink} to="/createUser">
                       Create User
                     </Link>
-                  </Typography>
+        </Typography> */}
 
                   <AuthButton></AuthButton>
                 </Box>

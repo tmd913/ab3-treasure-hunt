@@ -61,6 +61,7 @@ const generateResources = (playerId: string, groups: string[]): string[] => {
           `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/players/${playerId}/hunts`,
           `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/players/${playerId}/hunts/*`,
           `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/PUT/api/players/${playerId}/hunts/*`,
+          `arn:aws:execute-api:us-east-1:172877052175:${process.env.apiId}/*/GET/api/users/${playerId}`,
         ];
         break;
       case 'Admins':

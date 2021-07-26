@@ -22,6 +22,7 @@ import './Map.css';
 import Pin from './Pin';
 import HomeIcon from '@material-ui/icons/Home';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
+import GameResponse from '../shared/interfaces/GameResponse';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -43,6 +44,9 @@ const useStyles = makeStyles((theme: Theme) =>
       boxShadow: theme.shadows[10],
       borderRadius: 4,
     },
+    homeIconMarker: {
+      zIndex: 99,
+    },
     arrowIcon: {
       width: 50,
       height: 50,
@@ -50,6 +54,8 @@ const useStyles = makeStyles((theme: Theme) =>
       color: theme.palette.background.paper,
       boxShadow: theme.shadows[10],
       borderRadius: '50%',
+    },
+    arrowIconMarker: {
       zIndex: 100,
     },
   })
@@ -77,7 +83,7 @@ const flyToInterpolator = new FlyToInterpolator();
 
 const BASE_ROTATION = 360 - 112.5;
 
-const Map = ({
+export default function Map({
   onMapClick,
   marker,
   playerLocation,
@@ -99,7 +105,7 @@ const Map = ({
   handleLocationChange?: Function;
   createMockLocation?: Function;
   isWinner?: boolean;
-}) => {
+}) {
   const auth = useAuth();
 
   const classes = useStyles();
@@ -284,7 +290,7 @@ const Map = ({
       ? createMockLocation(startLocation)
       : [viewstate.longitude, viewstate.latitude];
 
-    const gameResponse = await handleLocationChange(endLocation);
+    const gameResponse: GameResponse = await handleLocationChange(endLocation);
     setTreasureBearing(gameResponse.treasureBearing);
 
     const [endLongitude, endLatitude]: [number, number] = endLocation;
@@ -305,6 +311,8 @@ const Map = ({
 
     setViewport({
       ...viewstate,
+      zoom: 18,
+      pitch: 45,
       longitude: endLongitude,
       latitude: endLatitude,
       bearing,
@@ -367,37 +375,8 @@ const Map = ({
                       }
                       offsetTop={-20}
                       offsetLeft={-25}
+                      className={classes.arrowIconMarker}
                     >
-                      <div className="current">
-                        <div
-                          className="radar-container"
-                          style={{
-                            transform: `rotate(${
-                              ((treasureBearing || 0) -
-                                rotation +
-                                BASE_ROTATION) %
-                              360
-                            }deg`,
-                          }}
-                        >
-                          <svg
-                            className="radar"
-                            height="20"
-                            width="20"
-                            viewBox="0 0 20 20"
-                          >
-                            <circle
-                              r="5"
-                              cx="50%"
-                              cy="50%"
-                              fill="transparent"
-                              stroke="rgba(235, 29, 29, 0.66)"
-                              strokeWidth="10"
-                              strokeDasharray="3.925 27.475"
-                            />
-                          </svg>
-                        </div>
-                      </div>
                       <ArrowUpwardIcon
                         id="arrowIcon"
                         className={classes.arrowIcon}
@@ -405,10 +384,11 @@ const Map = ({
                     </Marker>
 
                     <Marker
-                      longitude={geojson?.geometry.coordinates[0][0] || 0}
-                      latitude={geojson?.geometry.coordinates[0][1] || 0}
+                      longitude={geojson?.geometry.coordinates[0][0]}
+                      latitude={geojson?.geometry.coordinates[0][1]}
                       offsetTop={-20}
                       offsetLeft={-10}
+                      className={classes.homeIconMarker}
                     >
                       <HomeIcon className={classes.homeIcon} />
                     </Marker>
@@ -426,7 +406,7 @@ const Map = ({
                 </Marker>
               )}
 
-              <div style={{ position: 'absolute', left: 25, top: 80 }}>
+              <div style={{ position: 'absolute', right: 50, top: 20 }}>
                 <NavigationControl showCompass={true} />
                 <GeolocateControl
                   style={geolocateStyle}
@@ -454,6 +434,4 @@ const Map = ({
         )}
     </div>
   );
-};
-
-export default Map;
+}

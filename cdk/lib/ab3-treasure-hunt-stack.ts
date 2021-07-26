@@ -432,6 +432,23 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     cognitoGetUserAccess.addResources(userPool.userPoolArn);
     getUserHandler.addToRolePolicy(cognitoGetUserAccess);
 
+    const updateUserHandler = new lambdaNode.NodejsFunction(
+      this,
+      'updateUserHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        entry: path.join(__dirname, '../api/updateUser/index.ts'),
+        memorySize: 512,
+        environment: {
+          USER_POOL_ID: userPool.userPoolId,
+        },
+      }
+    );
+    const cognitoUpdateUserAccess = new iam.PolicyStatement();
+    cognitoUpdateUserAccess.addActions('cognito-idp:AdminUpdateUserAttributes');
+    cognitoUpdateUserAccess.addResources(userPool.userPoolArn);
+    updateUserHandler.addToRolePolicy(cognitoUpdateUserAccess);
+
     const searchPlaceIndexHandler = new lambdaNode.NodejsFunction(
       this,
       'searchPlaceIndexHandler',
@@ -533,6 +550,9 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     const usersRoute = apiRoute.addResource('users');
     const userRoute = usersRoute.addResource('{username}');
     userRoute.addMethod('GET', new apigw.LambdaIntegration(getUserHandler), {
+      authorizer,
+    });
+    userRoute.addMethod('PUT', new apigw.LambdaIntegration(updateUserHandler), {
       authorizer,
     });
 

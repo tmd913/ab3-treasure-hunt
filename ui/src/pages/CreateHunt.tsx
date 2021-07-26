@@ -2,6 +2,7 @@ import {
   Box,
   Button,
   createStyles,
+  Link,
   TextField,
   Theme,
   Typography,
@@ -18,6 +19,8 @@ import { useState } from 'react';
 import { getUser } from '../api/getUser';
 import { searchPlaceIndex } from '../api/searchPlaceIndex';
 import { CognitoIdentityServiceProvider } from 'aws-sdk';
+import { Link as RouterLink, useParams } from 'react-router-dom';
+import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -34,6 +37,20 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     mapButton: {
       backgroundColor: theme.palette.background.paper,
+      '&:hover': {
+        backgroundColor: theme.palette.grey[200],
+      },
+    },
+    backButton: {
+      backgroundColor: theme.palette.background.paper,
+      minWidth: 40,
+      width: 40,
+      height: 40,
+      borderRadius: '50%',
+      position: 'absolute',
+      top: 20,
+      left: 20,
+
       '&:hover': {
         backgroundColor: theme.palette.grey[200],
       },
@@ -162,7 +179,13 @@ export default function CreateHunt() {
   };
 
   return (
-    <Box p={2}>
+    <Box p={2} position="relative">
+      <Link component={RouterLink} to="/logs">
+        <Button variant="contained" className={classes.backButton}>
+          <ArrowBackIcon />
+        </Button>
+      </Link>
+
       <Typography className={classes.title} variant="h5" component="h2">
         Create Treasure Hunt
       </Typography>

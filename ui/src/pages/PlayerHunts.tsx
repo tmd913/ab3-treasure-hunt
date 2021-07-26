@@ -308,7 +308,7 @@ export default function PlayerHunts() {
                 </Box>
               ))
             ) : type && hunts?.items?.length > 0 && huntCardConfig ? (
-              hunts.items.map((item: any, index: number) => (
+              hunts.items.map((item: any) => (
                 <Box marginBottom="1rem" key={item.HuntID}>
                   <Hunt
                     hunt={item}
@@ -342,7 +342,7 @@ export default function PlayerHunts() {
         }
       >
         <Box p={2} className={classes.treasureDrawer}>
-          <Typography variant="h4">Treasure</Typography>
+          <Typography variant="h5">Treasure</Typography>
           <ImageIcon className={classes.treasureImage}></ImageIcon>
           <Typography>{currentTreasure?.TreasureDescription}</Typography>
         </Box>
