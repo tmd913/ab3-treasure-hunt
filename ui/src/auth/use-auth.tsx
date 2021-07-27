@@ -44,7 +44,7 @@ const useProvideAuth = () => {
 
   useEffect(() => {
     const fetchCredentials = async () => {
-      await handleAuthStateChange().catch(() => {
+      await handleSignIn().catch(() => {
         console.log('User not authenticated');
       });
     };
@@ -56,8 +56,10 @@ const useProvideAuth = () => {
     Hub.listen('auth', async ({ payload: { event, data } }) => {
       switch (event) {
         case 'signIn':
+          await handleSignIn();
+          break;
         case 'signOut':
-          await handleAuthStateChange();
+          await handleSignOut();
           break;
         case 'signIn_failure':
           console.error(data);
@@ -79,7 +81,7 @@ const useProvideAuth = () => {
   /**
    * Get necessary values from amplify Auth
    */
-  const handleAuthStateChange = async (): Promise<void> => {
+  const handleSignIn = async (): Promise<void> => {
     const user = await Auth.currentAuthenticatedUser();
     const idToken = (await Auth.currentSession()).getIdToken();
     const userGroups = idToken.payload['cognito:groups'];
@@ -89,6 +91,13 @@ const useProvideAuth = () => {
     setUserGroups(userGroups);
     setJwtToken(jwtToken);
     setCredentials(credentials);
+  };
+
+  const handleSignOut = async (): Promise<void> => {
+    setUser(undefined);
+    setUserGroups(undefined);
+    setJwtToken(undefined);
+    setCredentials(undefined);
   };
 
   // Return the user object and auth methods

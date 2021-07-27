@@ -13,6 +13,9 @@ export const createError = (err: Partial<AWSError>): APIGatewayProxyResult => {
       message: err?.message || 'Internal Server Error',
     }),
     statusCode: err?.statusCode || 500,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+    },
   };
 };
 

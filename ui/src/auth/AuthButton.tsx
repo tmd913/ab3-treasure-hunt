@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  CircularProgress,
   Divider,
   Drawer,
   IconButton,
@@ -8,6 +9,8 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  Portal,
+  Snackbar,
   TextField,
   Theme,
   Typography,
@@ -23,6 +26,7 @@ import { useFormik } from 'formik';
 import { ApiNames } from '../api/ApiNames.enum';
 import { updateUser } from '../api/updateUser';
 import { useEffect } from 'react';
+import { Alert } from '@material-ui/lab';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -78,32 +82,72 @@ const AuthButton = () => {
         zipCode,
       };
 
-      // await updateUser(
-      //   ApiNames.TREASURE_HUNT,
-      //   `/users/${auth.user.getUsername()}`,
-      //   {
-      //     headers: {
-      //       Authorization: 'Bearer ' + auth.jwtToken,
-      //       'Content-Type': 'application/json',
-      //     },
-      //     body,
-      //   }
-      // );
+      setIsUpdating(true);
+
+      try {
+        await updateUser(
+          ApiNames.TREASURE_HUNT,
+          `/users/${auth.user.getUsername()}`,
+          {
+            headers: {
+              Authorization: 'Bearer ' + auth.jwtToken,
+              'Content-Type': 'application/json',
+            },
+            body,
+          }
+        );
+
+        setSnackbarMessage('User profile updated!');
+      } catch (err) {
+        setSnackbarMessage('Failed to update user profile!');
+      } finally {
+        setIsUpdating(false);
+        setIsSnackbarOpen(true);
+      }
     },
   });
 
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isSnackbarOpen, setIsSnackbarOpen] = useState<boolean>(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>();
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
 
   useEffect(() => {
-    const zipCode = auth.user?.attributes.zipCode || '20037';
+    const zipCode = auth.user?.attributes['custom:zipCode'];
 
     if (zipCode) {
       formik.setFieldValue('zipCode', zipCode);
     }
   }, [auth]);
 
+  const handleClose = (event?: React.SyntheticEvent, reason?: string) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setIsSnackbarOpen(false);
+  };
+
   return (
     <>
+      <Portal>
+        <Snackbar
+          open={isSnackbarOpen}
+          autoHideDuration={6000}
+          onClose={handleClose}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert
+            elevation={6}
+            variant="filled"
+            onClose={handleClose}
+            severity="success"
+          >
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
+      </Portal>
+
       {auth.user ? (
         <Box display="flex">
           <IconButton
@@ -168,8 +212,18 @@ const AuthButton = () => {
                         color="primary"
                         disableElevation
                         fullWidth
+                        disabled={isUpdating}
                       >
-                        Submit
+                        {isUpdating ? (
+                          <CircularProgress
+                            style={{
+                              width: 24.5,
+                              height: 24.5,
+                            }}
+                          />
+                        ) : (
+                          'Submit'
+                        )}
                       </Button>
                     </form>
                   </Box>

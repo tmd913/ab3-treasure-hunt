@@ -1,8 +1,10 @@
 import {
   Box,
   Button,
+  CircularProgress,
   createStyles,
   Link,
+  Snackbar,
   TextField,
   Theme,
   Typography,
@@ -13,7 +15,6 @@ import { useFormik } from 'formik';
 import { createHunt } from '../api/createHunt';
 import { ApiNames } from '../api/ApiNames.enum';
 import { useAuth } from '../auth/use-auth';
-import { AmplifyS3ImagePicker } from '@aws-amplify/ui-react';
 import Map from '../components/Map';
 import { useState } from 'react';
 import { getUser } from '../api/getUser';
@@ -21,18 +22,21 @@ import { searchPlaceIndex } from '../api/searchPlaceIndex';
 import { CognitoIdentityServiceProvider } from 'aws-sdk';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
+import './CreateHunt.css';
+import ImageIcon from '@material-ui/icons/Image';
+import { Alert } from '@material-ui/lab';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
-    title: { textAlign: 'center', margin: '1rem 0' },
+    title: { textAlign: 'center', margin: '0.75rem 0 0' },
     submitButton: {
-      marginTop: '2rem',
+      margin: '1rem 0',
     },
     map: {
       flexGrow: 1,
-      minWidth: 400,
-      minHeight: '60vh',
-      marginTop: '1rem',
+      minWidth: 350,
+      minHeight: '70vh',
+      margin: '1rem',
       boxShadow: theme.shadows[4],
     },
     mapButton: {
@@ -54,6 +58,34 @@ const useStyles = makeStyles((theme: Theme) =>
       '&:hover': {
         backgroundColor: theme.palette.grey[200],
       },
+    },
+    imageContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderRadius: 4,
+      minWidth: 200,
+      minHeight: 200,
+      padding: '1rem',
+      boxSizing: 'content-box',
+      border: `1px solid ${theme.palette.grey[400]}`,
+    },
+    imageIcon: {
+      width: 150,
+      height: 150,
+    },
+    image: {
+      maxWidth: 200,
+      maxHeight: 200,
+    },
+    imageInput: {
+      display: 'none',
+    },
+    imageButton: {
+      marginTop: '0.75rem',
+    },
+    playerInfoButton: {
+      margin: '0.25rem 0 0.5rem',
     },
   })
 );
@@ -113,15 +145,24 @@ export default function CreateHunt() {
         triggerDistance,
       };
 
-      await createHunt(ApiNames.TREASURE_HUNT, '/hunts', {
-        headers: {
-          Authorization: 'Bearer ' + auth.jwtToken,
-          'Content-Type': 'application/json',
-        },
-        body,
-      });
+      setIsCreatingHunt(true);
 
-      formik.resetForm();
+      try {
+        await createHunt(ApiNames.TREASURE_HUNT, '/hunts', {
+          headers: {
+            Authorization: 'Bearer ' + auth.jwtToken,
+            'Content-Type': 'application/json',
+          },
+          body,
+        });
+
+        setSnackbarMessage('Treasure hunt created!');
+      } catch (err) {
+        setSnackbarMessage('Failed to create treasure hunt!');
+      } finally {
+        setIsCreatingHunt(false);
+        setIsSnackbarOpen(true);
+      }
     },
   });
 
@@ -136,6 +177,12 @@ export default function CreateHunt() {
   }>();
 
   const [playerID, setPlayerID] = useState<string>();
+  const [imageSrc, setImageSrc] = useState<string>();
+  const [imageFileName, setImageFileName] = useState<string>();
+  const [isSnackbarOpen, setIsSnackbarOpen] = useState<boolean>(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>();
+  const [isLoadingPlayer, setIsLoadingPlayer] = useState<boolean>(false);
+  const [isCreatingHunt, setIsCreatingHunt] = useState<boolean>(false);
 
   const handleMapClick = (e: any) => {
     console.log(e.lngLat);
@@ -149,20 +196,37 @@ export default function CreateHunt() {
   };
 
   const getUserInfo = async (username: string) => {
-    const user: CognitoIdentityServiceProvider.AdminGetUserResponse =
-      await getUser(ApiNames.TREASURE_HUNT, `/users/${username}`, {
+    setIsLoadingPlayer(true);
+
+    let user: CognitoIdentityServiceProvider.AdminGetUserResponse;
+    try {
+      user = await getUser(ApiNames.TREASURE_HUNT, `/users/${username}`, {
         headers: {
           Authorization: 'Bearer ' + auth.jwtToken,
           'Content-Type': 'application/json',
         },
       });
 
+      setSnackbarMessage('Player info retrieved!');
+    } catch (err) {
+      setSnackbarMessage('Failed to retrieve player info!');
+      return;
+    } finally {
+      setIsLoadingPlayer(false);
+      setIsSnackbarOpen(true);
+    }
+
     const playerID = user.Username;
     setPlayerID(playerID);
 
-    const zipCode =
-      user.UserAttributes?.find((attr) => attr.Name.includes('zipCode'))
-        ?.Value || '19610';
+    const zipCode = user.UserAttributes?.find((attr) =>
+      attr.Name.includes('zipCode')
+    )?.Value;
+
+    if (!zipCode) {
+      return;
+    }
+
     const playerCoords = await getCoordinatesFromZipCode(+zipCode);
     setPlayerLocation(playerCoords);
   };
@@ -178,8 +242,47 @@ export default function CreateHunt() {
     });
   };
 
+  const handleImageChange = (event: any) => {
+    const files = event.target.files;
+
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    const file = files[0];
+
+    if (file) {
+      setImageFileName(file.name);
+      setImageSrc(URL.createObjectURL(file));
+    }
+  };
+
+  const handleClose = (event?: React.SyntheticEvent, reason?: string) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setIsSnackbarOpen(false);
+  };
+
   return (
     <Box p={2} position="relative">
+      <Snackbar
+        open={isSnackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          elevation={6}
+          variant="filled"
+          onClose={handleClose}
+          severity="success"
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+
       <Link component={RouterLink} to="/logs">
         <Button variant="contained" className={classes.backButton}>
           <ArrowBackIcon />
@@ -191,17 +294,36 @@ export default function CreateHunt() {
       </Typography>
 
       <Box display="flex" flexWrap="wrap" justifyContent="center" p={2}>
-        <Box
-          display="flex"
-          justifyContent="center"
-          minWidth={950}
-          padding="0 1rem"
-        >
+        <Box display="flex" flexWrap="wrap" justifyContent="center">
           <Box marginTop="1rem" padding="0 1rem">
-            <AmplifyS3ImagePicker />
+            <Box className={classes.imageContainer}>
+              {imageSrc ? (
+                <img src={imageSrc} className={classes.image} />
+              ) : (
+                <ImageIcon className={classes.imageIcon} />
+              )}
+            </Box>
+            <input
+              accept="image/*"
+              className={classes.imageInput}
+              id="uploadButton"
+              type="file"
+              onChange={handleImageChange}
+            />
+            <label htmlFor="uploadButton">
+              <Button
+                className={classes.imageButton}
+                variant="contained"
+                disableElevation
+                fullWidth
+                component="span"
+              >
+                Upload Image
+              </Button>
+            </label>
           </Box>
 
-          <Box minWidth={400} maxWidth={500} padding="0 1rem">
+          <Box minWidth={300} maxWidth={500} padding="0 1rem">
             <Box>
               <form onSubmit={formik.handleSubmit}>
                 <TextField
@@ -245,11 +367,22 @@ export default function CreateHunt() {
 
                 <Button
                   variant="contained"
+                  disableElevation
                   fullWidth
-                  style={{ marginBottom: '1rem' }}
+                  className={classes.playerInfoButton}
                   onClick={() => getUserInfo(formik.values.playerEmail)}
+                  disabled={isLoadingPlayer}
                 >
-                  Get Player Info
+                  {isLoadingPlayer ? (
+                    <CircularProgress
+                      style={{
+                        width: 24.5,
+                        height: 24.5,
+                      }}
+                    />
+                  ) : (
+                    'Get Player Info'
+                  )}
                 </Button>
 
                 <TextField
@@ -310,10 +443,21 @@ export default function CreateHunt() {
                   className={classes.submitButton}
                   color="primary"
                   variant="contained"
+                  disableElevation
                   fullWidth
                   type="submit"
+                  disabled={isCreatingHunt}
                 >
-                  Submit
+                  {isCreatingHunt ? (
+                    <CircularProgress
+                      style={{
+                        width: 24.5,
+                        height: 24.5,
+                      }}
+                    />
+                  ) : (
+                    'Submit'
+                  )}
                 </Button>
               </form>
             </Box>

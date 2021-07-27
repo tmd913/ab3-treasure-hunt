@@ -30,6 +30,7 @@ import {
   ThemeProvider,
   Toolbar,
   Typography,
+  Button,
 } from '@material-ui/core';
 import BugReportIcon from '@material-ui/icons/BugReport';
 
@@ -42,13 +43,22 @@ export const theme = createTheme({
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     root: {
-      '& > * + *': {
-        marginLeft: theme.spacing(2),
-      },
+      width: '100%',
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      flexGrow: 1,
     },
     headerNav: {
       backgroundColor: theme.palette.primary.main,
       boxShadow: theme.shadows[2],
+    },
+    toolbar: {
+      color: 'white',
+      padding: '0 0.75rem',
+    },
+    homeButton: {
+      color: 'white',
     },
   })
 );
@@ -61,27 +71,34 @@ const App = withRouter(() => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <ProvideAuth>
-        {!isGame && (
-          <>
-            <AppBar className={classes.headerNav} position="sticky">
-              <Toolbar style={{ color: 'white' }}>
-                <Box
-                  display="flex"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  width="100%"
-                >
-                  <Typography variant="h5" component="h1">
-                    <BugReportIcon
-                      style={{
-                        fontSize: '1.75rem',
-                        verticalAlign: 'top',
-                      }}
-                    />
-                    SGC
-                  </Typography>
+        <Box className={classes.root}>
+          {!isGame && (
+            <>
+              <AppBar className={classes.headerNav} position="sticky">
+                <Toolbar className={classes.toolbar}>
+                  <Box
+                    display="flex"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    width="100%"
+                  >
+                    <Button
+                      className={classes.homeButton}
+                      component={RouterLink}
+                      to="/"
+                    >
+                      <Typography variant="h5" component="h1">
+                        <BugReportIcon
+                          style={{
+                            fontSize: '1.75rem',
+                            verticalAlign: 'top',
+                          }}
+                        />
+                        SGC
+                      </Typography>
+                    </Button>
 
-                  {/* <Typography className={classes.root}>
+                    {/* <Typography className={classes.root}>
                     <Link component={RouterLink} to="/">
                       Home
                     </Link>
@@ -103,37 +120,38 @@ const App = withRouter(() => {
                     </Link>
         </Typography> */}
 
-                  <AuthButton></AuthButton>
-                </Box>
-              </Toolbar>
-            </AppBar>
-          </>
-        )}
+                    <AuthButton></AuthButton>
+                  </Box>
+                </Toolbar>
+              </AppBar>
+            </>
+          )}
 
-        <Box>
-          <Switch>
-            <Route exact path="/">
-              <Home />
-            </Route>
-            <PrivateRoute path="/hunts" allowedGroups={['Players']}>
-              <PlayerHunts />
-            </PrivateRoute>
-            <PrivateRoute path="/games/:huntID" allowedGroups={['Players']}>
-              <Game />
-            </PrivateRoute>
-            <PrivateRoute path="/logs" allowedGroups={['Admins', 'Devs']}>
-              <HuntLogs />
-            </PrivateRoute>
-            <PrivateRoute path="/createHunt" allowedGroups={['Admins']}>
-              <CreateHunt />
-            </PrivateRoute>
-            <PrivateRoute path="/createUser" allowedGroups={['Admins']}>
-              <CreateUser />
-            </PrivateRoute>
-            <Route path="*">
-              <NotFound />
-            </Route>
-          </Switch>
+          <Box height="100%">
+            <Switch>
+              <Route exact path="/">
+                <Home />
+              </Route>
+              <PrivateRoute path="/hunts" allowedGroups={['Players']}>
+                <PlayerHunts />
+              </PrivateRoute>
+              <PrivateRoute path="/games/:huntID" allowedGroups={['Players']}>
+                <Game />
+              </PrivateRoute>
+              <PrivateRoute path="/logs" allowedGroups={['Admins', 'Devs']}>
+                <HuntLogs />
+              </PrivateRoute>
+              <PrivateRoute path="/createHunt" allowedGroups={['Admins']}>
+                <CreateHunt />
+              </PrivateRoute>
+              <PrivateRoute path="/createUser" allowedGroups={['Admins']}>
+                <CreateUser />
+              </PrivateRoute>
+              <Route path="*">
+                <NotFound />
+              </Route>
+            </Switch>
+          </Box>
         </Box>
       </ProvideAuth>
     </ThemeProvider>

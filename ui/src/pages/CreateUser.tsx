@@ -2,8 +2,10 @@ import {
   Box,
   Button,
   ButtonGroup,
+  CircularProgress,
   createStyles,
   Link,
+  Snackbar,
   TextField,
   Theme,
   Typography,
@@ -19,10 +21,12 @@ import ToggleButton from '@material-ui/lab/ToggleButton';
 import { ToggleButtonGroup } from 'formik-material-ui-lab';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
+import { Alert } from '@material-ui/lab';
+import { useState } from 'react';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
-    title: { textAlign: 'center', margin: '1rem 0' },
+    title: { textAlign: 'center', margin: '0.75rem 0' },
     submitButton: {
       marginTop: '2rem',
     },
@@ -79,8 +83,36 @@ export default function CreateUser() {
   const auth = useAuth();
   const classes = useStyles();
 
+  const [isSnackbarOpen, setIsSnackbarOpen] = useState<boolean>(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>();
+  const [isCreatingUser, setIsCreatingUser] = useState<boolean>(false);
+
+  const handleClose = (event?: React.SyntheticEvent, reason?: string) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setIsSnackbarOpen(false);
+  };
+
   return (
     <Box p={2} position="relative">
+      <Snackbar
+        open={isSnackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          elevation={6}
+          variant="filled"
+          onClose={handleClose}
+          severity="success"
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+
       <Link component={RouterLink} to="/logs">
         <Button variant="contained" className={classes.backButton}>
           <ArrowBackIcon />
@@ -105,15 +137,24 @@ export default function CreateUser() {
                 group: values.group,
               };
 
-              await createUser(ApiNames.TREASURE_HUNT, '/users', {
-                headers: {
-                  Authorization: 'Bearer ' + auth.jwtToken,
-                  'Content-Type': 'application/json',
-                },
-                body,
-              });
+              setIsCreatingUser(true);
 
-              actions.resetForm();
+              try {
+                await createUser(ApiNames.TREASURE_HUNT, '/users', {
+                  headers: {
+                    Authorization: 'Bearer ' + auth.jwtToken,
+                    'Content-Type': 'application/json',
+                  },
+                  body,
+                });
+
+                setSnackbarMessage('User created!');
+              } catch (err) {
+                setSnackbarMessage('Failed to create user!');
+              } finally {
+                setIsCreatingUser(false);
+                setIsSnackbarOpen(true);
+              }
             }}
           >
             {(props) => (
@@ -150,7 +191,9 @@ export default function CreateUser() {
                 >
                   <ToggleButton
                     className={`${classes.toggleButton}${
-                      props.errors.group ? ' ' + classes.toggleButtonError : ''
+                      props.touched.group && Boolean(props.errors.group)
+                        ? ' ' + classes.toggleButtonError
+                        : ''
                     }`}
                     name="group"
                     value="Admins"
@@ -159,7 +202,9 @@ export default function CreateUser() {
                   </ToggleButton>
                   <ToggleButton
                     className={`${classes.toggleButton}${
-                      props.errors.group ? ' ' + classes.toggleButtonError : ''
+                      props.touched.group && Boolean(props.errors.group)
+                        ? ' ' + classes.toggleButtonError
+                        : ''
                     }`}
                     name="group"
                     value="Devs"
@@ -177,10 +222,22 @@ export default function CreateUser() {
                   className={classes.submitButton}
                   color="primary"
                   variant="contained"
+                  disableElevation
                   fullWidth
                   type="submit"
+                  disabled={isCreatingUser}
                 >
-                  Submit
+                  {isCreatingUser ? (
+                    <CircularProgress
+                      style={{
+                        color: 'white',
+                        width: 24.5,
+                        height: 24.5,
+                      }}
+                    />
+                  ) : (
+                    'Submit'
+                  )}
                 </Button>
               </form>
             )}

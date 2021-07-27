@@ -1,7 +1,6 @@
 import {
   Context,
   APIGatewayProxyEventBase,
-  APIGatewayProxyEventPathParameters,
   APIGatewayProxyResultV2,
 } from 'aws-lambda';
 import { CognitoIdentityServiceProvider } from 'aws-sdk';
@@ -10,8 +9,9 @@ import { createError } from '../utils';
 
 const cognito = new CognitoIdentityServiceProvider();
 
-interface UpdateUserBody {
-  zipCode: string;
+interface CreateUserBody {
+  userEmail: string;
+  group: 'Admins' | 'Devs';
 }
 
 export const handler = async (
@@ -25,44 +25,38 @@ export const handler = async (
     });
   }
 
-  const { username }: APIGatewayProxyEventPathParameters =
-    event.pathParameters || {};
+  const body: CreateUserBody = event.body ? JSON.parse(event.body) : null;
+  const { userEmail, group } = body;
 
-  if (!username) {
+  if (!body || !userEmail || !group) {
     return createError({
-      message: 'Must provide player and hunt IDs!',
-      statusCode: 400,
-    });
-  }
-
-  const body: UpdateUserBody = event.body ? JSON.parse(event.body) : null;
-  const { zipCode } = body;
-
-  if (!body || zipCode == null) {
-    return createError({
-      message: 'Must provide request body with zip code!',
+      message: 'Must provide request body with user email and group!',
       statusCode: 400,
     });
   }
 
   try {
     await cognito
-      .adminUpdateUserAttributes({
+      .adminCreateUser({
         UserPoolId: process.env.USER_POOL_ID,
-        Username: username,
-        UserAttributes: [
-          {
-            Name: 'custom:zipCode',
-            Value: zipCode,
-          },
-        ],
+        Username: userEmail,
+        DesiredDeliveryMediums: ['EMAIL'],
+        TemporaryPassword: 'Temp123$',
+      })
+      .promise();
+
+    await cognito
+      .adminAddUserToGroup({
+        UserPoolId: process.env.USER_POOL_ID,
+        Username: userEmail,
+        GroupName: group,
       })
       .promise();
   } catch (err) {
     return createError(err);
   }
 
-  return new LambdaResponse(200, {
-    message: 'User attributes updated!',
+  return new LambdaResponse(201, {
+    message: 'User created!',
   });
 };

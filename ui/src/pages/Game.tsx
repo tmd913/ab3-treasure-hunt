@@ -340,7 +340,9 @@ const Game = () => {
         aria-labelledby="alert-dialog-slide-title"
         aria-describedby="alert-dialog-slide-description"
       >
-        <DialogTitle id="alert-dialog-slide-title">{'You win!'}</DialogTitle>
+        <DialogTitle id="alert-dialog-slide-title">
+          You discovered the hidden treasure!
+        </DialogTitle>
         <DialogContent style={{ minWidth: 300, minHeight: 300 }}>
           <DialogContentText id="alert-dialog-slide-description">
             {treasureDescription}

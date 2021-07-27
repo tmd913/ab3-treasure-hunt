@@ -37,6 +37,25 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     });
 
     // ============================================================
+    // S3 Treasure Images
+    // ============================================================
+
+    const treasureBucket = new s3.Bucket(this, 'treasureBucket', {
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      lifecycleRules: [
+        { abortIncompleteMultipartUploadAfter: cdk.Duration.days(7) },
+        { noncurrentVersionExpiration: cdk.Duration.days(7) },
+      ],
+      blockPublicAccess: {
+        blockPublicAcls: true,
+        blockPublicPolicy: true,
+        ignorePublicAcls: true,
+        restrictPublicBuckets: true,
+      },
+      versioned: true,
+    });
+
+    // ============================================================
     // Cognito User Pool
     // ============================================================
 
@@ -58,9 +77,10 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
         email: true,
       },
       customAttributes: {
-        zipCode: new cognito.NumberAttribute({
-          min: 5,
-          max: 5,
+        zipCode: new cognito.StringAttribute({
+          minLen: 5,
+          maxLen: 5,
+          mutable: true,
         }),
       },
       passwordPolicy: {
@@ -197,23 +217,56 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       },
     });
 
-    const mapAccessRole = new iam.Role(this, 'MapRole', {
-      description: 'Role to access Treasure Map',
+    const mapAccessPolicy = new iam.PolicyDocument({
+      statements: [
+        defaultIdentityStatement,
+        new iam.PolicyStatement({
+          sid: 'MapsReadOnly',
+          effect: iam.Effect.ALLOW,
+          actions: [
+            'geo:GetMapStyleDescriptor',
+            'geo:GetMapGlyphs',
+            'geo:GetMapSprites',
+            'geo:GetMapTile',
+          ],
+          resources: [map.attrArn],
+        }),
+      ],
+    });
+
+    const playerRole = new iam.Role(this, 'PlayerRole', {
+      description: 'Role for Players group',
       assumedBy: authPrincipal,
       inlinePolicies: {
-        mapAccessPolicy: new iam.PolicyDocument({
+        mapAccessPolicy,
+        s3PlayerViewPolicy: new iam.PolicyDocument({
           statements: [
             defaultIdentityStatement,
             new iam.PolicyStatement({
-              sid: 'MapsReadOnly',
+              sid: 'S3PlayerView',
               effect: iam.Effect.ALLOW,
-              actions: [
-                'geo:GetMapStyleDescriptor',
-                'geo:GetMapGlyphs',
-                'geo:GetMapSprites',
-                'geo:GetMapTile',
-              ],
-              resources: [map.attrArn],
+              actions: ['s3:GetObject'],
+              // TODO: restrict access to treasure within player ID prefix
+              resources: [`${treasureBucket.bucketArn}/*`],
+            }),
+          ],
+        }),
+      },
+    });
+
+    const adminRole = new iam.Role(this, 'AdminRole', {
+      description: 'Role for Players group',
+      assumedBy: authPrincipal,
+      inlinePolicies: {
+        mapAccessPolicy,
+        s3AdminPutPolicy: new iam.PolicyDocument({
+          statements: [
+            defaultIdentityStatement,
+            new iam.PolicyStatement({
+              sid: 'S3AdminPut',
+              effect: iam.Effect.ALLOW,
+              actions: ['s3:PutObject'],
+              resources: [`${treasureBucket.bucketArn}/*`],
             }),
           ],
         }),
@@ -242,13 +295,13 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     new cognito.CfnUserPoolGroup(this, 'PlayersGroup', {
       groupName: 'Players',
       userPoolId: userPool.userPoolId,
-      roleArn: mapAccessRole.roleArn,
+      roleArn: playerRole.roleArn,
     });
 
     new cognito.CfnUserPoolGroup(this, 'AdminsGroup', {
       groupName: 'Admins',
       userPoolId: userPool.userPoolId,
-      roleArn: mapAccessRole.roleArn,
+      roleArn: adminRole.roleArn,
     });
 
     new cognito.CfnUserPoolGroup(this, 'DevsGroup', {
@@ -324,15 +377,6 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING,
       },
       projectionType: ProjectionType.ALL,
-    });
-    const playersTable = new dynamodb.Table(this, 'PlayersTable', {
-      partitionKey: {
-        name: 'Email',
-        type: dynamodb.AttributeType.STRING,
-      },
-      readCapacity: 5,
-      writeCapacity: 5,
-      encryption: TableEncryption.AWS_MANAGED,
     });
 
     // ============================================================
@@ -410,7 +454,6 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
         memorySize: 512,
         environment: {
           PLAYER_HUNTS_TABLE: playerHuntsTable.tableName,
-          PLAYERS_TABLE: playersTable.tableName,
         },
       }
     );
@@ -449,6 +492,26 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     cognitoUpdateUserAccess.addResources(userPool.userPoolArn);
     updateUserHandler.addToRolePolicy(cognitoUpdateUserAccess);
 
+    const createUserHandler = new lambdaNode.NodejsFunction(
+      this,
+      'createUserHandler',
+      {
+        runtime: lambda.Runtime.NODEJS_14_X,
+        entry: path.join(__dirname, '../api/createUser/index.ts'),
+        memorySize: 512,
+        environment: {
+          USER_POOL_ID: userPool.userPoolId,
+        },
+      }
+    );
+    const cognitoCreateUserAccess = new iam.PolicyStatement();
+    cognitoCreateUserAccess.addActions(
+      'cognito-idp:AdminCreateUser',
+      'cognito-idp:AdminAddUserToGroup'
+    );
+    cognitoCreateUserAccess.addResources(userPool.userPoolArn);
+    createUserHandler.addToRolePolicy(cognitoCreateUserAccess);
+
     const searchPlaceIndexHandler = new lambdaNode.NodejsFunction(
       this,
       'searchPlaceIndexHandler',
@@ -472,7 +535,6 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     playerHuntsTable.grantReadWriteData(updatePlayerHuntHandler);
     playerHuntsTable.grantReadWriteData(getHuntsHandler);
     playerHuntsTable.grantReadWriteData(createHuntHandler);
-    playersTable.grantReadWriteData(createHuntHandler);
 
     // ============================================================
     // API Gateway
@@ -548,6 +610,12 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
 
     // ==> /api/users/{username}
     const usersRoute = apiRoute.addResource('users');
+    usersRoute.addMethod(
+      'POST',
+      new apigw.LambdaIntegration(createUserHandler),
+      { authorizer }
+    );
+
     const userRoute = usersRoute.addResource('{username}');
     userRoute.addMethod('GET', new apigw.LambdaIntegration(getUserHandler), {
       authorizer,

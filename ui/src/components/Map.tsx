@@ -24,6 +24,8 @@ import HomeIcon from '@material-ui/icons/Home';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import GameResponse from '../shared/interfaces/GameResponse';
 
+const IS_MOCK = false;
+
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     mapContainer: {
@@ -54,6 +56,7 @@ const useStyles = makeStyles((theme: Theme) =>
       color: theme.palette.background.paper,
       boxShadow: theme.shadows[10],
       borderRadius: '50%',
+      zIndex: 100,
     },
     arrowIconMarker: {
       zIndex: 100,
@@ -268,6 +271,8 @@ export default function Map({
 
     setGeoUpdateInProgress(true);
 
+    console.log(viewstate);
+
     // store element in order to render custom arrow icon
     if (!current) {
       const currentEl = document.querySelector('.current');
@@ -281,12 +286,11 @@ export default function Map({
     const coordinates = data?.geometry.coordinates;
     const len = coordinates.length;
     const startLocation: [number, number] = (coordinates[len - 1] || [
-      -77.1, 38.9,
+      viewstate.longitude,
+      viewstate.latitude,
     ]) as [number, number];
 
-    const isMock = false;
-
-    const endLocation = isMock
+    const endLocation = IS_MOCK
       ? createMockLocation(startLocation)
       : [viewstate.longitude, viewstate.latitude];
 
@@ -306,13 +310,15 @@ export default function Map({
     };
 
     // store direction player is heading
-    const bearing = calculateBearing(startLoc, endLoc);
+    const bearing =
+      IS_MOCK || !viewstate.bearing
+        ? calculateBearing(startLoc, endLoc)
+        : viewstate.bearing;
     setHeading(bearing);
 
     setViewport({
       ...viewstate,
-      zoom: 18,
-      pitch: 45,
+      zoom: 17,
       longitude: endLongitude,
       latitude: endLatitude,
       bearing,
@@ -338,15 +344,7 @@ export default function Map({
               mapStyle={environment.mapName}
               onViewportChange={(viewstate: ViewState) => {
                 setViewport(viewstate);
-
-                // if (!isAdmin) {
-                //   setCounter(counter + 1);
-                //   if (counter % 10 === 0) {
-                //     setRotation(rotation + 10);
-                //   }
-                // }
-
-                setRotation(viewstate?.bearing || 0);
+                setRotation(viewstate.bearing || 0);
               }}
               onClick={(e: any) => {
                 if (onMapClick) {
@@ -381,6 +379,39 @@ export default function Map({
                         id="arrowIcon"
                         className={classes.arrowIcon}
                       />
+
+                      {!isWinner && (
+                        <div className="current">
+                          <div
+                            className="radar-container"
+                            style={{
+                              transform: `rotate(${
+                                ((treasureBearing || 0) -
+                                  rotation +
+                                  BASE_ROTATION) %
+                                360
+                              }deg`,
+                            }}
+                          >
+                            <svg
+                              className="radar"
+                              height="20"
+                              width="20"
+                              viewBox="0 0 20 20"
+                            >
+                              <circle
+                                r="5"
+                                cx="50%"
+                                cy="50%"
+                                fill="transparent"
+                                stroke="rgba(235, 29, 29, 0.66)"
+                                strokeWidth="10"
+                                strokeDasharray="3.925 27.475"
+                              />
+                            </svg>
+                          </div>
+                        </div>
+                      )}
                     </Marker>
 
                     <Marker

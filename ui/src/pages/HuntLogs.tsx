@@ -101,6 +101,7 @@ export default function HuntLogs() {
     <Box className={classes.container}>
       <Box
         display="flex"
+        flexWrap="wrap"
         justifyContent="space-between"
         alignItems="end"
         marginBottom="1rem"
@@ -112,7 +113,7 @@ export default function HuntLogs() {
         </Box>
 
         {auth?.userGroups?.includes('Admins') && (
-          <Box>
+          <Box marginTop="0.25rem">
             <Button
               className={classes.createHuntButton}
               variant="contained"
