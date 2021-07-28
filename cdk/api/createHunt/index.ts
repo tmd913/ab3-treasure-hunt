@@ -40,13 +40,14 @@ export const handler = async (
     });
   }
 
+  let huntID: string;
   try {
-    await createHunt(adminEmail, body);
+    huntID = await createHunt(adminEmail, body);
   } catch (err) {
     return createError(err);
   }
 
-  return new LambdaResponse(201, { message: 'Treasure Hunt Created' });
+  return new LambdaResponse(201, { huntID });
 };
 
 /**
@@ -65,7 +66,7 @@ const isMissingBodyProperty = (body: CreateHuntBody): boolean => {
   );
 };
 
-const createHunt = (adminEmail: string, body: CreateHuntBody) => {
+const createHunt = async (adminEmail: string, body: CreateHuntBody) => {
   const now = new Date();
   const year = now.getUTCFullYear();
   const timestamp = now.toISOString();
@@ -73,21 +74,21 @@ const createHunt = (adminEmail: string, body: CreateHuntBody) => {
   const {
     playerID,
     playerEmail,
-    treasureImage,
     treasureDescription,
     treasureLocation: { latitude, longitude },
     triggerDistance,
   } = body;
 
-  return docClient
+  const huntID = uuidv4();
+
+  await docClient
     .put({
       TableName: process.env.PLAYER_HUNTS_TABLE!,
       Item: {
         PlayerID: playerID,
-        HuntID: uuidv4(),
+        HuntID: huntID,
         PlayerEmail: playerEmail,
         PlayerLocations: [],
-        TreasureImage: treasureImage,
         TreasureDescription: treasureDescription,
         TreasureLocation: {
           latitude,
@@ -102,4 +103,6 @@ const createHunt = (adminEmail: string, body: CreateHuntBody) => {
       },
     })
     .promise();
+
+  return huntID;
 };

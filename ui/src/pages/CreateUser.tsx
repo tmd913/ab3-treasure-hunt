@@ -36,6 +36,7 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     toggleButton: {
       width: '50%',
+      color: `${theme.palette.text.secondary} !important`,
     },
     toggleButtonError: {
       border: '1px solid #f44336',
@@ -85,6 +86,7 @@ export default function CreateUser() {
 
   const [isSnackbarOpen, setIsSnackbarOpen] = useState<boolean>(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string>();
+  const [isSuccess, setIsSuccess] = useState<boolean>();
   const [isCreatingUser, setIsCreatingUser] = useState<boolean>(false);
 
   const handleClose = (event?: React.SyntheticEvent, reason?: string) => {
@@ -107,7 +109,7 @@ export default function CreateUser() {
           elevation={6}
           variant="filled"
           onClose={handleClose}
-          severity="success"
+          severity={isSuccess ? 'success' : 'error'}
         >
           {snackbarMessage}
         </Alert>
@@ -149,8 +151,10 @@ export default function CreateUser() {
                 });
 
                 setSnackbarMessage('User created!');
+                setIsSuccess(true);
               } catch (err) {
                 setSnackbarMessage('Failed to create user!');
+                setIsSuccess(false);
               } finally {
                 setIsCreatingUser(false);
                 setIsSnackbarOpen(true);
@@ -230,7 +234,6 @@ export default function CreateUser() {
                   {isCreatingUser ? (
                     <CircularProgress
                       style={{
-                        color: 'white',
                         width: 24.5,
                         height: 24.5,
                       }}

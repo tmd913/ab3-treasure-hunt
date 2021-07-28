@@ -12,6 +12,7 @@ import * as dynamodb from '@aws-cdk/aws-dynamodb';
 import * as location from '@aws-cdk/aws-location';
 import { ProjectionType, TableEncryption } from '@aws-cdk/aws-dynamodb';
 import { Duration } from '@aws-cdk/core';
+import { HttpMethods } from '@aws-cdk/aws-s3';
 
 export class Ab3TreasureHuntStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -53,6 +54,26 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
         restrictPublicBuckets: true,
       },
       versioned: true,
+      cors: [
+        {
+          allowedHeaders: ['*'],
+          allowedMethods: [
+            HttpMethods.GET,
+            HttpMethods.HEAD,
+            HttpMethods.PUT,
+            HttpMethods.POST,
+            HttpMethods.DELETE,
+          ],
+          allowedOrigins: ['*'],
+          exposedHeaders: [
+            'x-amz-server-side-encryption',
+            'x-amz-request-id',
+            'x-amz-id-2',
+            'ETag',
+          ],
+          maxAge: 3000,
+        },
+      ],
     });
 
     // ============================================================
@@ -245,9 +266,12 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
             new iam.PolicyStatement({
               sid: 'S3PlayerView',
               effect: iam.Effect.ALLOW,
-              actions: ['s3:GetObject'],
-              // TODO: restrict access to treasure within player ID prefix
-              resources: [`${treasureBucket.bucketArn}/*`],
+              actions: ['s3:*'],
+              resources: [
+                '*',
+                // treasureBucket.bucketArn +
+                //   '/private/${cognito-identity.amazonaws.com:sub}/*',
+              ],
             }),
           ],
         }),
@@ -266,7 +290,7 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
               sid: 'S3AdminPut',
               effect: iam.Effect.ALLOW,
               actions: ['s3:PutObject'],
-              resources: [`${treasureBucket.bucketArn}/*`],
+              resources: [treasureBucket.bucketArn + '/public/*'],
             }),
           ],
         }),
@@ -709,6 +733,10 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'mapName', {
       value: map.mapName,
+    });
+
+    new cdk.CfnOutput(this, 'treasureBucketName', {
+      value: treasureBucket.bucketName,
     });
 
     new cdk.CfnOutput(this, 'distributionDomainName', {

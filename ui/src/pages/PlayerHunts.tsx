@@ -1,9 +1,13 @@
 import {
   Box,
   Button,
+  ButtonTypeMap,
+  CircularProgress,
   Drawer,
+  ExtendButtonBase,
   List,
   makeStyles,
+  Snackbar,
   Typography,
 } from '@material-ui/core';
 import { createStyles } from '@material-ui/styles';
@@ -24,6 +28,9 @@ import ButtonConfig, { ButtonType } from '../shared/classes/ButtonConfig';
 import Skeleton from '@material-ui/lab/Skeleton';
 import { useHistory } from 'react-router-dom';
 import ImageIcon from '@material-ui/icons/Image';
+import { Alert } from '@material-ui/lab';
+import CustomButtonConfig from '../shared/classes/CustomButtonConfig';
+import { Storage } from 'aws-amplify';
 
 const useStyles = makeStyles(() =>
   createStyles({
@@ -62,6 +69,10 @@ const useStyles = makeStyles(() =>
     treasureImage: {
       fontSize: '8rem',
     },
+    image: {
+      maxWidth: 200,
+      maxHeight: 200,
+    },
   })
 );
 
@@ -77,7 +88,13 @@ export default function PlayerHunts() {
   const [tabValue, setTabValue] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isTreasureOpen, setIsTreasureOpen] = useState<boolean>(false);
-  const [currentTreasure, setCurrentTreasure] = useState<any>();
+  const [treasureDescription, setTreasureDescription] = useState<string>();
+  const [treasureImage, setTreasureImage] = useState<Object | string>();
+  const [isSnackbarOpen, setIsSnackbarOpen] = useState<boolean>(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>();
+  const [isSuccess, setIsSuccess] = useState<boolean>();
+  const [isAccepting, setIsAccepting] = useState<boolean>(false);
+  const [isDenying, setIsDenying] = useState<boolean>(false);
 
   useEffect(() => {
     const type = query.get('type')?.toUpperCase() as HuntType;
@@ -122,23 +139,79 @@ export default function PlayerHunts() {
         break;
       case HuntType.CREATED:
         setTabValue(2);
+
+        const createCustomButton =
+          (isLoading: boolean) =>
+          (huntID: string, key: string, buttonConfig: CustomButtonConfig) =>
+            (
+              <Button
+                key={key}
+                variant="contained"
+                disableElevation
+                color={buttonConfig.color}
+                onClick={() => {
+                  buttonConfig.onClickHandler(huntID);
+                }}
+                style={{ width: 82 }}
+                type="submit"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <CircularProgress
+                    style={{
+                      width: 24.5,
+                      height: 24.5,
+                    }}
+                  />
+                ) : (
+                  buttonConfig.text
+                )}
+              </Button>
+            );
+
         setHuntCardConfig(
           new HuntCardConfig('Hunt Invites', 'Invited at', 'CreatedAt', [
-            new FunctionButtonConfig(
+            new CustomButtonConfig(
               'Accept',
               'primary',
               async (huntID: string) => {
-                await updateHunt(huntID, HuntType.ACCEPTED);
-                getAndSetHunts();
-              }
+                setIsAccepting(true);
+                const success = await updateHunt(huntID, HuntType.ACCEPTED);
+                setIsAccepting(false);
+                if (!success) {
+                  return;
+                }
+                setHunts({
+                  ...hunts,
+                  ...{
+                    items: hunts.items.filter(
+                      (hunt: any) => hunt.HuntID !== huntID
+                    ),
+                  },
+                });
+              },
+              createCustomButton
             ),
-            new FunctionButtonConfig(
+            new CustomButtonConfig(
               'Deny',
               'secondary',
               async (huntID: string) => {
-                await updateHunt(huntID, HuntType.DENIED);
-                getAndSetHunts();
-              }
+                setIsDenying(true);
+                const success = await updateHunt(huntID, HuntType.DENIED);
+                setIsDenying(false);
+                if (!success) {
+                  return;
+                }
+                setHunts({
+                  ...hunts,
+                  ...{
+                    items: hunts.items.filter(
+                      (hunt: any) => hunt.HuntID !== huntID
+                    ),
+                  },
+                });
+              },
+              createCustomButton
             ),
           ])
         );
@@ -154,13 +227,27 @@ export default function PlayerHunts() {
               new FunctionButtonConfig(
                 'Details',
                 'primary',
-                (huntID: string) => {
+                async (huntID: string) => {
                   const items = hunts?.items || [];
                   const treasure = items.find(
                     (hunt: any) => hunt.HuntID === huntID
                   );
-                  setCurrentTreasure(treasure);
+
+                  if (!treasure.TreasureDescription) {
+                    return;
+                  }
+
+                  setTreasureDescription(treasure.TreasureDescription);
+
                   toggleDrawer(true);
+
+                  const treasureImage = await Storage.get(
+                    `${auth.user.getUsername()}/${huntID}`
+                  );
+
+                  if (treasureImage) {
+                    setTreasureImage(treasureImage);
+                  }
                 }
               ),
             ]
@@ -174,43 +261,63 @@ export default function PlayerHunts() {
     setHunts(await getHunts());
   };
 
-  const getHunts = async (): Promise<any[]> => {
+  const getHunts = async (): Promise<any> => {
     if (!type) {
       return [];
     }
 
     setIsLoading(true);
 
-    const hunts = await getPlayerHunts(
-      ApiNames.TREASURE_HUNT,
-      `/players/${auth.user.getUsername()}/hunts?type=${type}`,
-      {
-        headers: {
-          Authorization: 'Bearer ' + auth.jwtToken,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    setIsLoading(false);
+    let hunts;
+    try {
+      hunts = await getPlayerHunts(
+        ApiNames.TREASURE_HUNT,
+        `/players/${auth.user.getUsername()}/hunts?type=${type}`,
+        {
+          headers: {
+            Authorization: 'Bearer ' + auth.jwtToken,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } catch (err) {
+      hunts = { items: [] };
+    } finally {
+      setIsLoading(false);
+    }
 
     return hunts;
   };
 
-  const updateHunt = async (huntID: string, type: HuntType): Promise<void> => {
-    await updatePlayerHunt(
-      ApiNames.TREASURE_HUNT,
-      `/players/${auth.user.getUsername()}/hunts/${huntID}`,
-      {
-        headers: {
-          Authorization: 'Bearer ' + auth.jwtToken,
-          'Content-Type': 'application/json',
-        },
-        body: {
-          type,
-        },
-      }
-    );
+  const updateHunt = async (
+    huntID: string,
+    type: HuntType
+  ): Promise<boolean> => {
+    try {
+      await updatePlayerHunt(
+        ApiNames.TREASURE_HUNT,
+        `/players/${auth.user.getUsername()}/hunts/${huntID}`,
+        {
+          headers: {
+            Authorization: 'Bearer ' + auth.jwtToken,
+            'Content-Type': 'application/json',
+          },
+          body: {
+            type,
+          },
+        }
+      );
+
+      setSnackbarMessage('Hunt type updated!');
+      setIsSuccess(true);
+      setIsSnackbarOpen(true);
+      return true;
+    } catch (err) {
+      setSnackbarMessage('Failed to updated hunt type!');
+      setIsSuccess(false);
+      setIsSnackbarOpen(true);
+      return false;
+    }
   };
 
   const renderButton = (
@@ -257,6 +364,11 @@ export default function PlayerHunts() {
             {functionButtonConfig.text}
           </Button>
         );
+      case ButtonType.CUSTOM:
+        const customButtonConfig = buttonConfig as CustomButtonConfig;
+        return customButtonConfig.createCustomButton(
+          buttonConfig.text === 'Accept' ? isAccepting : isDenying
+        )(huntID, key, customButtonConfig);
       default:
         return <></>;
     }
@@ -289,9 +401,33 @@ export default function PlayerHunts() {
     setIsTreasureOpen(isOpen);
   };
 
+  const handleClose = (event?: React.SyntheticEvent, reason?: string) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setIsSnackbarOpen(false);
+  };
+
   return (
     <>
       <Box className={classes.mainContentContainer}>
+        <Snackbar
+          open={isSnackbarOpen}
+          autoHideDuration={6000}
+          onClose={handleClose}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert
+            elevation={6}
+            variant="filled"
+            onClose={handleClose}
+            severity={isSuccess ? 'success' : 'error'}
+          >
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
+
         <Box className={classes.mainContent}>
           <Typography variant="h5" component="h2" className={classes.title}>
             {huntCardConfig?.title}
@@ -343,8 +479,11 @@ export default function PlayerHunts() {
       >
         <Box p={2} className={classes.treasureDrawer}>
           <Typography variant="h5">Treasure</Typography>
-          <ImageIcon className={classes.treasureImage}></ImageIcon>
-          <Typography>{currentTreasure?.TreasureDescription}</Typography>
+          {/* <ImageIcon className={classes.treasureImage}></ImageIcon> */}
+          {treasureImage && (
+            <img src={treasureImage.toString()} className={classes.image} />
+          )}
+          <Typography>{treasureDescription}</Typography>
         </Box>
       </Drawer>
 

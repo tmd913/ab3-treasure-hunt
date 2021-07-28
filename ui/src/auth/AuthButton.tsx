@@ -98,8 +98,10 @@ const AuthButton = () => {
         );
 
         setSnackbarMessage('User profile updated!');
+        setIsSuccess(true);
       } catch (err) {
         setSnackbarMessage('Failed to update user profile!');
+        setIsSuccess(false);
       } finally {
         setIsUpdating(false);
         setIsSnackbarOpen(true);
@@ -110,6 +112,7 @@ const AuthButton = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isSnackbarOpen, setIsSnackbarOpen] = useState<boolean>(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string>();
+  const [isSuccess, setIsSuccess] = useState<boolean>();
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
 
   useEffect(() => {
@@ -141,7 +144,7 @@ const AuthButton = () => {
             elevation={6}
             variant="filled"
             onClose={handleClose}
-            severity="success"
+            severity={isSuccess ? 'success' : 'error'}
           >
             {snackbarMessage}
           </Alert>

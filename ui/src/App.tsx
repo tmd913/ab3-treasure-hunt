@@ -33,8 +33,11 @@ import {
   Button,
 } from '@material-ui/core';
 import BugReportIcon from '@material-ui/icons/BugReport';
+import { Storage } from 'aws-amplify';
 
 Amplify.configure(amplifyConfig);
+
+Storage.configure();
 
 export const theme = createTheme({
   spacing: 8,

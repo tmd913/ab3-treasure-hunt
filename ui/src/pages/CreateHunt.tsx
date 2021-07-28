@@ -25,6 +25,7 @@ import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 import './CreateHunt.css';
 import ImageIcon from '@material-ui/icons/Image';
 import { Alert } from '@material-ui/lab';
+import { Storage } from 'aws-amplify';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -148,7 +149,11 @@ export default function CreateHunt() {
       setIsCreatingHunt(true);
 
       try {
-        await createHunt(ApiNames.TREASURE_HUNT, '/hunts', {
+        if (!imageFile) {
+          throw new Error();
+        }
+
+        const { huntID } = await createHunt(ApiNames.TREASURE_HUNT, '/hunts', {
           headers: {
             Authorization: 'Bearer ' + auth.jwtToken,
             'Content-Type': 'application/json',
@@ -156,9 +161,14 @@ export default function CreateHunt() {
           body,
         });
 
+        const res = await Storage.put(`${playerID}/${huntID}`, imageFile);
+        console.log(res);
+
         setSnackbarMessage('Treasure hunt created!');
+        setIsSuccess(true);
       } catch (err) {
         setSnackbarMessage('Failed to create treasure hunt!');
+        setIsSuccess(false);
       } finally {
         setIsCreatingHunt(false);
         setIsSnackbarOpen(true);
@@ -178,9 +188,11 @@ export default function CreateHunt() {
 
   const [playerID, setPlayerID] = useState<string>();
   const [imageSrc, setImageSrc] = useState<string>();
+  const [imageFile, setImageFile] = useState<File>();
   const [imageFileName, setImageFileName] = useState<string>();
   const [isSnackbarOpen, setIsSnackbarOpen] = useState<boolean>(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string>();
+  const [isSuccess, setIsSuccess] = useState<boolean>();
   const [isLoadingPlayer, setIsLoadingPlayer] = useState<boolean>(false);
   const [isCreatingHunt, setIsCreatingHunt] = useState<boolean>(false);
 
@@ -208,8 +220,10 @@ export default function CreateHunt() {
       });
 
       setSnackbarMessage('Player info retrieved!');
+      setIsSuccess(true);
     } catch (err) {
       setSnackbarMessage('Failed to retrieve player info!');
+      setIsSuccess(false);
       return;
     } finally {
       setIsLoadingPlayer(false);
@@ -252,6 +266,7 @@ export default function CreateHunt() {
     const file = files[0];
 
     if (file) {
+      setImageFile(file);
       setImageFileName(file.name);
       setImageSrc(URL.createObjectURL(file));
     }
@@ -277,7 +292,7 @@ export default function CreateHunt() {
           elevation={6}
           variant="filled"
           onClose={handleClose}
-          severity="success"
+          severity={isSuccess ? 'success' : 'error'}
         >
           {snackbarMessage}
         </Alert>
