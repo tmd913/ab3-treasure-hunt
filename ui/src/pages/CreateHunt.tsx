@@ -65,11 +65,12 @@ const useStyles = makeStyles((theme: Theme) =>
       justifyContent: 'center',
       alignItems: 'center',
       borderRadius: 4,
-      minWidth: 200,
-      minHeight: 200,
+      width: 200,
+      height: 200,
       padding: '1rem',
       boxSizing: 'content-box',
       border: `1px solid ${theme.palette.grey[400]}`,
+      background: theme.palette.background.paper,
     },
     imageIcon: {
       width: 150,
@@ -87,6 +88,10 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     playerInfoButton: {
       margin: '0.25rem 0 0.5rem',
+    },
+    formInput: {
+      background: theme.palette.background.paper,
+      borderRadius: 4,
     },
   })
 );
@@ -329,7 +334,6 @@ export default function CreateHunt() {
               <Button
                 className={classes.imageButton}
                 variant="contained"
-                disableElevation
                 fullWidth
                 component="span"
               >
@@ -342,6 +346,7 @@ export default function CreateHunt() {
             <Box>
               <form onSubmit={formik.handleSubmit}>
                 <TextField
+                  className={classes.formInput}
                   variant="outlined"
                   multiline
                   rows={4}
@@ -363,6 +368,7 @@ export default function CreateHunt() {
                 ></TextField>
 
                 <TextField
+                  className={classes.formInput}
                   variant="outlined"
                   fullWidth
                   margin="normal"
@@ -382,7 +388,6 @@ export default function CreateHunt() {
 
                 <Button
                   variant="contained"
-                  disableElevation
                   fullWidth
                   className={classes.playerInfoButton}
                   onClick={() => getUserInfo(formik.values.playerEmail)}
@@ -401,6 +406,7 @@ export default function CreateHunt() {
                 </Button>
 
                 <TextField
+                  className={classes.formInput}
                   type="number"
                   variant="outlined"
                   fullWidth
@@ -417,6 +423,7 @@ export default function CreateHunt() {
                 ></TextField>
 
                 <TextField
+                  className={classes.formInput}
                   type="number"
                   variant="outlined"
                   fullWidth
@@ -435,6 +442,7 @@ export default function CreateHunt() {
                 ></TextField>
 
                 <TextField
+                  className={classes.formInput}
                   type="number"
                   variant="outlined"
                   fullWidth
@@ -458,7 +466,6 @@ export default function CreateHunt() {
                   className={classes.submitButton}
                   color="primary"
                   variant="contained"
-                  disableElevation
                   fullWidth
                   type="submit"
                   disabled={isCreatingHunt}

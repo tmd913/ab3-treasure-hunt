@@ -28,6 +28,8 @@ import confetti from 'canvas-confetti';
 import React from 'react';
 import { TransitionProps } from '@material-ui/core/transitions';
 import GameResponse from '../shared/interfaces/GameResponse';
+import { Storage } from 'aws-amplify';
+import { Skeleton } from '@material-ui/lab';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -68,6 +70,68 @@ const useStyles = makeStyles((theme: Theme) =>
       borderRadius: 4,
       zIndex: 99,
     },
+    dialog: {
+      backgroundColor: 'rgb(252,246,186)',
+      background:
+        'linear-gradient(150deg, rgba(252,246,186,1) 0%, rgba(252,246,186,1) 5%, rgba(170,119,28,1) 100%)',
+    },
+    dialogCard: {
+      backgroundColor: 'rgb(252,246,186)',
+      background:
+        'linear-gradient(150deg, rgba(252,246,186,1) 0%, rgba(252,246,186,1) 5%, rgba(170,119,28,1) 100%)',
+      padding: '0.5rem',
+    },
+    dialogContent: {
+      margin: '0 0 1rem 0',
+    },
+    dialogTitle: {
+      textAlign: 'center',
+    },
+    treasureImage: {
+      fontSize: '8rem',
+    },
+    imageContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      marginBottom: '1rem',
+    },
+    imageWrapper: {
+      borderRadius: 4,
+      width: 200,
+      height: 200,
+      boxSizing: 'content-box',
+      padding: '1rem',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      background: theme.palette.background.paper,
+      boxShadow: theme.shadows[4],
+    },
+    image: {
+      maxWidth: 200,
+      maxHeight: 200,
+    },
+    skeleton: {
+      borderRadius: 4,
+      width: 200,
+      height: 200,
+      boxSizing: 'content-box',
+      padding: '1rem',
+    },
+    treasureDescriptionContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+    },
+    treasureDescription: {
+      width: '100%',
+      maxWidth: 450,
+      boxSizing: 'content-box',
+      marginTop: '1rem',
+      padding: '1rem',
+      borderRadius: 4,
+      background: theme.palette.background.paper,
+      boxShadow: theme.shadows[4],
+    },
   })
 );
 
@@ -89,6 +153,8 @@ const Game = () => {
   const [treasureDistance, setTreasureDistance] = useState<number>();
   const [treasureDescription, setTreasureDescription] = useState<string>();
   const [open, setOpen] = React.useState(false);
+  const [isTreasureLoading, setIsTreasureLoading] = useState<boolean>(true);
+  const [treasureImage, setTreasureImage] = useState<Object | string>();
 
   useEffect(() => {
     const getExistingLocations = async () => {
@@ -119,6 +185,8 @@ const Game = () => {
     // }, 5000);
 
     if (isWinner) {
+      getTreasureImage(huntID);
+
       setOpen(true);
       setTimeout(() => {
         celebrate();
@@ -128,6 +196,117 @@ const Game = () => {
       }, 600);
     }
   }, [isWinner]);
+
+  const getLocations = async (
+    playerID: string,
+    huntID: string
+  ): Promise<[number, number][]> => {
+    const hunt = await getPlayerHunt(
+      ApiNames.TREASURE_HUNT,
+      `/players/${playerID}/hunts/${huntID}`,
+      {
+        headers: {
+          Authorization: 'Bearer ' + auth.jwtToken,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return hunt.item.PlayerLocations.length === 0
+      ? []
+      : hunt.item.PlayerLocations.map((location: Location) => [
+          location.longitude,
+          location.latitude,
+        ]);
+  };
+
+  const addLocation = async (
+    playerID: string,
+    huntID: string,
+    location: { longitude: number; latitude: number }
+  ): Promise<GameResponse> => {
+    const gameResponse: GameResponse = await updatePlayerHunt(
+      ApiNames.TREASURE_HUNT,
+      `/players/${playerID}/hunts/${huntID}`,
+      {
+        headers: {
+          Authorization: 'Bearer ' + auth.jwtToken,
+          'Content-Type': 'application/json',
+        },
+        body: {
+          location,
+        },
+      }
+    );
+
+    setTreasureDistance(gameResponse.treasureDistance);
+
+    if (gameResponse.isWinner) {
+      setTreasureDescription(gameResponse.treasureDescription);
+      setIsWinner(true);
+    }
+
+    return gameResponse;
+  };
+
+  const handleLocationChange = async (newLocation: GeoJSON.Position) => {
+    if (!geojson) {
+      return {};
+    }
+
+    const gameResponse = await addLocation(auth.user.getUsername(), huntID, {
+      longitude: newLocation[0],
+      latitude: newLocation[1],
+    });
+
+    setGeojson(Object.assign({}, buildGeojson([newLocation], geojson)));
+
+    return gameResponse;
+  };
+
+  const buildGeojson = (
+    newLocations: GeoJSON.Position[],
+    geojson: GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties>
+  ): GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties> => {
+    const coordinates: GeoJSON.Position[] = [
+      ...geojson.geometry.coordinates,
+      ...newLocations,
+    ];
+
+    return {
+      ...geojson,
+      ...{ geometry: { type: 'LineString', coordinates } },
+    };
+  };
+
+  const createMockLocation = (
+    previousLocation: GeoJSON.Position
+  ): GeoJSON.Position => {
+    const [prevLong, prevLat] = previousLocation;
+
+    let isPositive = Boolean(Math.floor(Math.random() * 2));
+    const nextLong = prevLong + (Math.random() / 100) * (isPositive ? 1 : -1);
+
+    isPositive = Boolean(Math.floor(Math.random() * 2));
+    const nextLat = prevLat + (Math.random() / 100) * (isPositive ? 1 : -1);
+
+    return [nextLong, nextLat];
+  };
+
+  const getTreasureImage = async (huntID: string) => {
+    setIsTreasureLoading(true);
+    try {
+      const treasureImage = await Storage.get(
+        `${auth.user.getUsername()}/${huntID}`
+      );
+      setTreasureImage(treasureImage);
+    } catch (err) {
+      console.log('Failed to retrieve image!');
+      setTreasureImage(undefined);
+    } finally {
+      setIsTreasureLoading(false);
+    }
+  };
 
   const fireworks = () => {
     var duration = 3000;
@@ -203,103 +382,6 @@ const Game = () => {
     });
   };
 
-  const getLocations = async (
-    playerID: string,
-    huntID: string
-  ): Promise<[number, number][]> => {
-    const hunt = await getPlayerHunt(
-      ApiNames.TREASURE_HUNT,
-      `/players/${playerID}/hunts/${huntID}`,
-      {
-        headers: {
-          Authorization: 'Bearer ' + auth.jwtToken,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    return hunt.item.PlayerLocations.length === 0
-      ? []
-      : hunt.item.PlayerLocations.map((location: Location) => [
-          location.longitude,
-          location.latitude,
-        ]);
-  };
-
-  const addLocation = async (
-    playerID: string,
-    huntID: string,
-    location: { longitude: number; latitude: number }
-  ): Promise<GameResponse> => {
-    const gameResponse: GameResponse = await updatePlayerHunt(
-      ApiNames.TREASURE_HUNT,
-      `/players/${playerID}/hunts/${huntID}`,
-      {
-        headers: {
-          Authorization: 'Bearer ' + auth.jwtToken,
-          'Content-Type': 'application/json',
-        },
-        body: {
-          location,
-        },
-      }
-    );
-
-    console.log(gameResponse);
-    setTreasureDistance(gameResponse.treasureDistance);
-
-    if (gameResponse.isWinner) {
-      setIsWinner(true);
-      setTreasureDescription(gameResponse.treasureDescription);
-    }
-
-    return gameResponse;
-  };
-
-  const handleLocationChange = async (newLocation: GeoJSON.Position) => {
-    if (!geojson) {
-      return {};
-    }
-
-    const gameResponse = await addLocation(auth.user.getUsername(), huntID, {
-      longitude: newLocation[0],
-      latitude: newLocation[1],
-    });
-
-    setGeojson(Object.assign({}, buildGeojson([newLocation], geojson)));
-
-    return gameResponse;
-  };
-
-  const buildGeojson = (
-    newLocations: GeoJSON.Position[],
-    geojson: GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties>
-  ): GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties> => {
-    const coordinates: GeoJSON.Position[] = [
-      ...geojson.geometry.coordinates,
-      ...newLocations,
-    ];
-
-    return {
-      ...geojson,
-      ...{ geometry: { type: 'LineString', coordinates } },
-    };
-  };
-
-  const createMockLocation = (
-    previousLocation: GeoJSON.Position
-  ): GeoJSON.Position => {
-    const [prevLong, prevLat] = previousLocation;
-
-    let isPositive = Boolean(Math.floor(Math.random() * 2));
-    const nextLong = prevLong + (Math.random() / 100) * (isPositive ? 1 : -1);
-
-    isPositive = Boolean(Math.floor(Math.random() * 2));
-    const nextLat = prevLat + (Math.random() / 100) * (isPositive ? 1 : -1);
-
-    return [nextLong, nextLat];
-  };
-
   const handleClose = () => {
     setOpen(false);
   };
@@ -333,6 +415,7 @@ const Game = () => {
       )}
 
       <Dialog
+        className={classes.dialog}
         open={open}
         TransitionComponent={Transition}
         keepMounted
@@ -340,33 +423,51 @@ const Game = () => {
         aria-labelledby="alert-dialog-slide-title"
         aria-describedby="alert-dialog-slide-description"
       >
-        <DialogTitle id="alert-dialog-slide-title">
-          You discovered the hidden treasure!
-        </DialogTitle>
-        <DialogContent style={{ minWidth: 300, minHeight: 300 }}>
-          <DialogContentText id="alert-dialog-slide-description">
-            {treasureDescription}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            variant="contained"
-            disableElevation
-            color="primary"
-            component={RouterLink}
-            to="/hunts?type=completed"
+        <Box className={classes.dialogCard}>
+          <DialogTitle
+            className={classes.dialogTitle}
+            id="alert-dialog-slide-title"
           >
-            Explore Treasure
-          </Button>
-          <Button
-            onClick={handleClose}
-            variant="contained"
-            disableElevation
-            color="secondary"
-          >
-            Close
-          </Button>
-        </DialogActions>
+            You discovered treasure!
+          </DialogTitle>
+
+          <DialogContent className={classes.dialogContent}>
+            <Box className={classes.imageContainer}>
+              {isTreasureLoading ? (
+                <Skeleton className={classes.skeleton} variant="rect" />
+              ) : (
+                treasureImage && (
+                  <Box className={classes.imageWrapper}>
+                    <img
+                      src={treasureImage.toString()}
+                      className={classes.image}
+                    />
+                  </Box>
+                )
+              )}
+            </Box>
+
+            <Box className={classes.treasureDescriptionContainer}>
+              <Typography className={classes.treasureDescription}>
+                {treasureDescription}
+              </Typography>
+            </Box>
+          </DialogContent>
+
+          <DialogActions>
+            <Button
+              variant="contained"
+              color="primary"
+              component={RouterLink}
+              to="/hunts?type=completed"
+            >
+              Explore Treasure
+            </Button>
+            <Button onClick={handleClose} variant="contained" color="secondary">
+              Close
+            </Button>
+          </DialogActions>
+        </Box>
       </Dialog>
     </>
   );

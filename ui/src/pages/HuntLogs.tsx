@@ -117,7 +117,6 @@ export default function HuntLogs() {
             <Button
               className={classes.createHuntButton}
               variant="contained"
-              disableElevation
               color="primary"
               component={RouterLink}
               to="/createHunt"
@@ -125,12 +124,7 @@ export default function HuntLogs() {
               Create Hunt
             </Button>
 
-            <Button
-              variant="contained"
-              disableElevation
-              component={RouterLink}
-              to="/createUser"
-            >
+            <Button variant="contained" component={RouterLink} to="/createUser">
               Create User
             </Button>
           </Box>

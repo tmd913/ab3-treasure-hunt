@@ -3,7 +3,7 @@ import { PropTypes } from '@material-ui/core';
 export enum ButtonType {
   LINK,
   FUNCTION,
-  CUSTOM,
+  INVITE,
 }
 
 export default abstract class ButtonConfig {

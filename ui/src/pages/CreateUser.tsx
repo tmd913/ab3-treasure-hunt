@@ -15,11 +15,10 @@ import * as yup from 'yup';
 import { ErrorMessage, Field, Formik, useFormik } from 'formik';
 import { ApiNames } from '../api/ApiNames.enum';
 import { useAuth } from '../auth/use-auth';
-import { CognitoIdentityServiceProvider } from 'aws-sdk';
 import { createUser } from '../api/createUser';
 import ToggleButton from '@material-ui/lab/ToggleButton';
 import { ToggleButtonGroup } from 'formik-material-ui-lab';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 import { Alert } from '@material-ui/lab';
 import { useState } from 'react';
@@ -37,6 +36,7 @@ const useStyles = makeStyles((theme: Theme) =>
     toggleButton: {
       width: '50%',
       color: `${theme.palette.text.secondary} !important`,
+      borderColor: theme.palette.grey[400],
     },
     toggleButtonError: {
       border: '1px solid #f44336',
@@ -63,6 +63,10 @@ const useStyles = makeStyles((theme: Theme) =>
       '&:hover': {
         backgroundColor: theme.palette.grey[200],
       },
+    },
+    formInput: {
+      background: theme.palette.background.paper,
+      borderRadius: 4,
     },
   })
 );
@@ -164,6 +168,7 @@ export default function CreateUser() {
             {(props) => (
               <form onSubmit={props.handleSubmit}>
                 <TextField
+                  className={classes.formInput}
                   variant="outlined"
                   fullWidth
                   margin="normal"
@@ -183,7 +188,9 @@ export default function CreateUser() {
                   id="group"
                   name="group"
                   type="checkbox"
-                  className={classes.toggleButtonGroup}
+                  className={
+                    classes.toggleButtonGroup + ' ' + classes.formInput
+                  }
                   value={props.values.group}
                   exclusive
                   onChange={(e: any, group: string) => {
@@ -226,7 +233,6 @@ export default function CreateUser() {
                   className={classes.submitButton}
                   color="primary"
                   variant="contained"
-                  disableElevation
                   fullWidth
                   type="submit"
                   disabled={isCreatingUser}

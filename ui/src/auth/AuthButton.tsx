@@ -3,7 +3,6 @@ import {
   Button,
   CircularProgress,
   Divider,
-  Drawer,
   IconButton,
   List,
   ListItem,
@@ -11,6 +10,7 @@ import {
   ListItemText,
   Portal,
   Snackbar,
+  SwipeableDrawer,
   TextField,
   Theme,
   Typography,
@@ -27,12 +27,17 @@ import { ApiNames } from '../api/ApiNames.enum';
 import { updateUser } from '../api/updateUser';
 import { useEffect } from 'react';
 import { Alert } from '@material-ui/lab';
+import CloseIcon from '@material-ui/icons/Close';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
+    drawer: {
+      width: '100vw',
+      maxWidth: 500,
+      padding: '1rem 0.5rem',
+    },
     list: {
-      width: '75vw',
-      maxWidth: 400,
+      width: '100%',
       padding: '0.5rem 1rem',
     },
     iconButton: {
@@ -53,6 +58,12 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     signOutButton: {
       marginTop: '1rem',
+    },
+    closeIcon: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      zIndex: 9999,
     },
   })
 );
@@ -159,95 +170,111 @@ const AuthButton = () => {
           >
             <AccountCircleIcon fontSize="large" />
           </IconButton>
-          <Drawer anchor="right" open={isOpen} onClose={() => setIsOpen(false)}>
-            <List className={classes.list}>
-              <ListItem>
-                <ListItemIcon>
-                  <MailIcon />
-                </ListItemIcon>
-                <ListItemText primary={auth.user.attributes.email} />
-              </ListItem>
 
-              <ListItem>
-                <ListItemIcon>
-                  <GroupIcon />
-                </ListItemIcon>
-                <ListItemText primary={auth.userGroups?.toString()} />
-              </ListItem>
+          <SwipeableDrawer
+            anchor="right"
+            open={isOpen}
+            onOpen={() => setIsOpen(true)}
+            onClose={() => setIsOpen(false)}
+          >
+            <Box className={classes.drawer}>
+              <IconButton
+                className={classes.closeIcon}
+                aria-label="close"
+                onClick={() => setIsOpen(false)}
+              >
+                <CloseIcon />
+              </IconButton>
 
-              <Divider />
+              <List className={classes.list}>
+                <ListItem>
+                  <ListItemIcon>
+                    <MailIcon />
+                  </ListItemIcon>
+                  <ListItemText primary={auth.user.attributes.email} />
+                </ListItem>
 
-              {auth.userGroups?.includes('Players') && (
-                <>
-                  <Box padding="1rem 1rem">
-                    <Typography
-                      className={classes.zipCodeHeader}
-                      variant="h6"
-                      component="h3"
-                    >
-                      Update User Profile
-                    </Typography>
+                <ListItem>
+                  <ListItemIcon>
+                    <GroupIcon />
+                  </ListItemIcon>
+                  <ListItemText primary={auth.userGroups?.toString()} />
+                </ListItem>
 
-                    <form onSubmit={formik.handleSubmit}>
-                      <TextField
-                        className={classes.zipCodeInput}
-                        variant="outlined"
-                        fullWidth
-                        margin="normal"
-                        id="zipCode"
-                        name="zipCode"
-                        label="Zip Code*"
-                        value={formik.values.zipCode}
-                        onChange={formik.handleChange}
-                        error={
-                          formik.touched.zipCode &&
-                          Boolean(formik.errors.zipCode)
-                        }
-                        helperText={
-                          formik.touched.zipCode && formik.errors.zipCode
-                        }
-                      ></TextField>
+                <Divider />
 
-                      <Button
-                        className={classes.zipCodeButton}
-                        type="submit"
-                        variant="contained"
-                        color="primary"
-                        disableElevation
-                        fullWidth
-                        disabled={isUpdating}
+                {auth.userGroups?.includes('Players') && (
+                  <>
+                    <Box padding="1rem 1rem">
+                      <Typography
+                        className={classes.zipCodeHeader}
+                        variant="h6"
+                        component="h3"
                       >
-                        {isUpdating ? (
-                          <CircularProgress
-                            style={{
-                              width: 24.5,
-                              height: 24.5,
-                            }}
-                          />
-                        ) : (
-                          'Submit'
-                        )}
-                      </Button>
-                    </form>
-                  </Box>
+                        Update User Profile
+                      </Typography>
 
-                  <Divider />
-                </>
-              )}
+                      <form onSubmit={formik.handleSubmit}>
+                        <TextField
+                          className={classes.zipCodeInput}
+                          variant="outlined"
+                          fullWidth
+                          margin="normal"
+                          id="zipCode"
+                          name="zipCode"
+                          label="Zip Code*"
+                          value={formik.values.zipCode}
+                          onChange={formik.handleChange}
+                          error={
+                            formik.touched.zipCode &&
+                            Boolean(formik.errors.zipCode)
+                          }
+                          helperText={
+                            formik.touched.zipCode && formik.errors.zipCode
+                          }
+                        ></TextField>
 
-              <ListItem>
-                <Button
-                  className={classes.signOutButton}
-                  variant="contained"
-                  disableElevation
-                  fullWidth
-                  onClick={() => auth.signOut()}
-                >
-                  Sign out
-                </Button>
-              </ListItem>
-            </List>
-          </Drawer>
+                        <Button
+                          className={classes.zipCodeButton}
+                          type="submit"
+                          variant="contained"
+                          color="primary"
+                          disableElevation
+                          fullWidth
+                          disabled={isUpdating}
+                        >
+                          {isUpdating ? (
+                            <CircularProgress
+                              style={{
+                                width: 24.5,
+                                height: 24.5,
+                              }}
+                            />
+                          ) : (
+                            'Submit'
+                          )}
+                        </Button>
+                      </form>
+                    </Box>
+
+                    <Divider />
+                  </>
+                )}
+
+                <ListItem>
+                  <Button
+                    className={classes.signOutButton}
+                    variant="contained"
+                    disableElevation
+                    fullWidth
+                    onClick={() => auth.signOut()}
+                  >
+                    Sign out
+                  </Button>
+                </ListItem>
+              </List>
+            </Box>
+          </SwipeableDrawer>
         </Box>
       ) : (
         <Button

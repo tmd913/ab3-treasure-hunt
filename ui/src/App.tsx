@@ -47,10 +47,13 @@ const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     root: {
       width: '100%',
-      height: '100vh',
+      minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
       flexGrow: 1,
+      backgroundColor: 'rgb(245,253,255)',
+      background:
+        'linear-gradient(160deg, rgba(245,253,255,1) 0%, rgba(245,253,255,1) 25%, rgba(193,223,255,1) 100%)',
     },
     headerNav: {
       backgroundColor: theme.palette.primary.main,
@@ -101,28 +104,6 @@ const App = withRouter(() => {
                       </Typography>
                     </Button>
 
-                    {/* <Typography className={classes.root}>
-                    <Link component={RouterLink} to="/">
-                      Home
-                    </Link>
-
-                    <Link component={RouterLink} to="/hunts?type=started">
-                      Player Hunts
-                    </Link>
-
-                    <Link component={RouterLink} to="/logs">
-                      Hunt Logs
-                    </Link>
-
-                    <Link component={RouterLink} to="/createHunt">
-                      Create Hunt
-                    </Link>
-
-                    <Link component={RouterLink} to="/createUser">
-                      Create User
-                    </Link>
-        </Typography> */}
-
                     <AuthButton></AuthButton>
                   </Box>
                 </Toolbar>
@@ -130,7 +111,7 @@ const App = withRouter(() => {
             </>
           )}
 
-          <Box height="100%">
+          <Box display="flex" flexDirection="column" flexGrow="1" height="100%">
             <Switch>
               <Route exact path="/">
                 <Home />
