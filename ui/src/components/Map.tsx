@@ -104,6 +104,7 @@ export default function Map({
   handleLocationChange,
   createMockLocation,
   isWinner,
+  isRotating,
 }: {
   onMapClick?: Function;
   marker?: {
@@ -118,6 +119,7 @@ export default function Map({
   handleLocationChange?: Function;
   createMockLocation?: Function;
   isWinner?: boolean;
+  isRotating?: boolean;
 }) {
   const auth = useAuth();
 
@@ -205,7 +207,7 @@ export default function Map({
         'style',
         `transform: rotate(${(heading || 0) - rotation}deg)`
       );
-  }, [current, rotation]);
+  }, [current, rotation, heading]);
 
   const isMapViewable = (groups?: string[]): boolean => {
     if (!groups || groups.length === 0) {
@@ -336,7 +338,7 @@ export default function Map({
       zoom: 17,
       longitude: endLongitude,
       latitude: endLatitude,
-      bearing,
+      bearing: isRotating ? bearing : viewstate.bearing,
       transitionDuration: 1000,
       transitionInterpolator: flyToInterpolator,
       transitionEasing: easeCubic,

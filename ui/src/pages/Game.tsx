@@ -54,6 +54,18 @@ const useStyles = makeStyles((theme: Theme) =>
       top: 20,
       left: 20,
     },
+    rotationButtonContainer: {
+      position: 'absolute',
+      bottom: 30,
+      width: '100%',
+      display: 'flex',
+      justifyContent: 'center',
+      pointerEvents: 'none',
+    },
+    rotationButton: {
+      zIndex: 99,
+      pointerEvents: 'all',
+    },
     distanceContainer: {
       position: 'absolute',
       top: 20,
@@ -155,6 +167,7 @@ const Game = () => {
   const [open, setOpen] = React.useState(false);
   const [isTreasureLoading, setIsTreasureLoading] = useState<boolean>(false);
   const [treasureImage, setTreasureImage] = useState<Object | string>();
+  const [isRotating, setIsRotating] = useState<boolean>(true);
 
   useEffect(() => {
     const getExistingLocations = async () => {
@@ -389,6 +402,7 @@ const Game = () => {
           handleLocationChange={handleLocationChange}
           createMockLocation={createMockLocation}
           isWinner={isWinner}
+          isRotating={isRotating}
         ></Map>
       </Box>
 
@@ -408,6 +422,17 @@ const Game = () => {
           </Typography>
         </Box>
       )}
+
+      <Box className={classes.rotationButtonContainer}>
+        <Button
+          variant="contained"
+          color="primary"
+          className={classes.rotationButton}
+          onClick={() => setIsRotating(!isRotating)}
+        >
+          {isRotating ? 'Disable' : 'Enable'} Rotation
+        </Button>
+      </Box>
 
       <Dialog
         className={classes.dialog}
