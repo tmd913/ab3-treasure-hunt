@@ -36,7 +36,7 @@ const useStyles = makeStyles(() =>
       width: '100%',
       display: 'flex',
       justifyContent: 'center',
-      paddingBottom: 72,
+      paddingBottom: 80,
     },
     mainContent: {
       width: '100%',
@@ -104,7 +104,9 @@ export default function PlayerHunts() {
         setTabValue(0);
         setHuntCardConfig(
           new HuntCardConfig('Started Hunts', 'Started at', 'StartedAt', [
-            new LinkButtonConfig('Resume', 'primary', gameUrl),
+            new LinkButtonConfig('Resume', 'primary', gameUrl, () => {
+              window.location.reload();
+            }),
           ])
         );
         break;
@@ -116,8 +118,9 @@ export default function PlayerHunts() {
               'Start',
               'primary',
               gameUrl,
-              (huntID: string) => {
-                updateHunt(huntID, HuntType.STARTED);
+              async (huntID: string) => {
+                await updateHunt(huntID, HuntType.STARTED);
+                window.location.reload();
               }
             ),
           ])
@@ -316,11 +319,11 @@ export default function PlayerHunts() {
     link: string,
     onClickHandler?: Function
   ) => {
+    history.push(link);
+
     if (onClickHandler) {
       onClickHandler(huntID);
     }
-
-    history.push(link);
   };
 
   const handleClose = (event?: React.SyntheticEvent, reason?: string) => {

@@ -23,6 +23,7 @@ import Pin from './Pin';
 import HomeIcon from '@material-ui/icons/Home';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import GameResponse from '../shared/interfaces/GameResponse';
+import { constants } from 'perf_hooks';
 
 const IS_MOCK = false;
 
@@ -40,26 +41,35 @@ const useStyles = makeStyles((theme: Theme) =>
       },
     },
     homeIcon: {
-      width: 40,
-      height: 40,
+      width: 45,
+      height: 45,
       backgroundColor: theme.palette.background.paper,
-      boxShadow: theme.shadows[10],
+      border: `3px solid ${theme.palette.info.main}`,
       borderRadius: 4,
+      zIndex: 99,
+      position: 'relative',
+      overflow: 'hidden',
     },
     homeIconMarker: {
-      zIndex: 99,
+      width: 45,
+      height: 45,
+      borderRadius: 4,
     },
     arrowIcon: {
       width: 50,
       height: 50,
       backgroundColor: theme.palette.primary.main,
       color: theme.palette.background.paper,
-      boxShadow: theme.shadows[10],
+      border: `3px solid ${theme.palette.info.main}`,
       borderRadius: '50%',
       zIndex: 100,
+      position: 'relative',
+      overflow: 'hidden',
     },
     arrowIconMarker: {
-      zIndex: 100,
+      width: 50,
+      height: 50,
+      borderRadius: '50%',
     },
   })
 );
@@ -126,7 +136,6 @@ export default function Map({
   const [rotation, setRotation] = useState<number>(0);
   const [dot, setDot] = useState<Element>();
   const [current, setCurrent] = useState<Element>();
-  const [counter, setCounter] = useState<number>(0);
   const [isAdmin, setIsAdmin] = useState<boolean>();
   const [data, setData] =
     useState<GeoJSON.Feature<GeoJSON.LineString, GeoJSON.GeoJsonProperties>>();
@@ -176,11 +185,17 @@ export default function Map({
   }, [auth]);
 
   useEffect(() => {
-    document
+    if (dot) {
+      return;
+    }
+    const dotEl = document
       .querySelector(
         '.mapboxgl-user-location-dot.mapboxgl-marker.mapboxgl-marker-anchor-center'
       )
       ?.setAttribute('style', 'display: none');
+    if (dotEl) {
+      setDot(dotEl);
+    }
   }, [current]);
 
   useEffect(() => {
@@ -271,13 +286,10 @@ export default function Map({
 
     setGeoUpdateInProgress(true);
 
-    console.log(viewstate);
-
     // store element in order to render custom arrow icon
     if (!current) {
       const currentEl = document.querySelector('.current');
       if (currentEl) {
-        currentEl.setAttribute('style', 'text-content: center');
         setCurrent(currentEl);
       }
     }
@@ -294,8 +306,14 @@ export default function Map({
       ? createMockLocation(startLocation)
       : [viewstate.longitude, viewstate.latitude];
 
-    const gameResponse: GameResponse = await handleLocationChange(endLocation);
-    setTreasureBearing(gameResponse.treasureBearing);
+    try {
+      const gameResponse: GameResponse = await handleLocationChange(
+        endLocation
+      );
+      setTreasureBearing(gameResponse.treasureBearing);
+    } catch (err) {
+      console.log(err);
+    }
 
     const [endLongitude, endLatitude]: [number, number] = endLocation;
     const [startLongitude, startLatitude]: [number, number] = startLocation;
@@ -310,10 +328,7 @@ export default function Map({
     };
 
     // store direction player is heading
-    const bearing =
-      IS_MOCK || !viewstate.bearing
-        ? calculateBearing(startLoc, endLoc)
-        : viewstate.bearing;
+    const bearing = calculateBearing(startLoc, endLoc);
     setHeading(bearing);
 
     setViewport({
@@ -352,14 +367,24 @@ export default function Map({
                 }
               }}
             >
-              <Source id="my-data" type="geojson" data={data}>
-                <Layer {...layerStyle} source="my-data" />
-              </Source>
-
               {geojson &&
                 geojson.geometry &&
                 geojson.geometry.coordinates?.length > 0 && (
                   <>
+                    <Source id="my-data" type="geojson" data={data}>
+                      <Layer {...layerStyle} source="my-data" />
+                    </Source>
+
+                    <Marker
+                      longitude={geojson?.geometry.coordinates[0][0]}
+                      latitude={geojson?.geometry.coordinates[0][1]}
+                      offsetTop={-22.5}
+                      offsetLeft={-20}
+                      className={classes.homeIconMarker}
+                    >
+                      <HomeIcon className={classes.homeIcon} />
+                    </Marker>
+
                     <Marker
                       longitude={
                         geojson?.geometry.coordinates[
@@ -412,16 +437,6 @@ export default function Map({
                           </div>
                         </div>
                       )}
-                    </Marker>
-
-                    <Marker
-                      longitude={geojson?.geometry.coordinates[0][0]}
-                      latitude={geojson?.geometry.coordinates[0][1]}
-                      offsetTop={-20}
-                      offsetLeft={-10}
-                      className={classes.homeIconMarker}
-                    >
-                      <HomeIcon className={classes.homeIcon} />
                     </Marker>
                   </>
                 )}

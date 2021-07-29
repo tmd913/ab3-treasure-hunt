@@ -30,6 +30,16 @@ import { Storage } from 'aws-amplify';
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     title: { textAlign: 'center', margin: '0.75rem 0 0' },
+    formContainer: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      background: theme.palette.background.paper,
+      margin: '1rem',
+      padding: '1rem',
+      borderRadius: 4,
+      boxShadow: theme.shadows[2],
+    },
     submitButton: {
       margin: '1rem 0',
     },
@@ -38,7 +48,9 @@ const useStyles = makeStyles((theme: Theme) =>
       minWidth: 350,
       minHeight: '70vh',
       margin: '1rem',
-      boxShadow: theme.shadows[4],
+      borderRadius: 4,
+      overflow: 'hidden',
+      boxShadow: theme.shadows[2],
     },
     mapButton: {
       backgroundColor: theme.palette.background.paper,
@@ -89,10 +101,6 @@ const useStyles = makeStyles((theme: Theme) =>
     playerInfoButton: {
       margin: '0.25rem 0 0.5rem',
     },
-    formInput: {
-      background: theme.palette.background.paper,
-      borderRadius: 4,
-    },
   })
 );
 
@@ -112,10 +120,21 @@ const validationSchema = yup.object({
     .string()
     .email('Enter a valid email')
     .required('Player email is required'),
-  latitude: yup.number().min(-90).max(90).required('Latitude is required'),
-  longitude: yup.number().min(-180).max(180).required('Longitude is required'),
+  latitude: yup
+    .number()
+    .typeError('Latitude must be a number')
+    .min(-90)
+    .max(90)
+    .required('Latitude is required'),
+  longitude: yup
+    .number()
+    .typeError('Longitude must be a number')
+    .min(-180)
+    .max(180)
+    .required('Longitude is required'),
   triggerDistance: yup
     .number()
+    .typeError('Trigger distance must be a number')
     .positive('Enter a positive trigger distance')
     .required('Trigger distance is required'),
 });
@@ -314,7 +333,7 @@ export default function CreateHunt() {
       </Typography>
 
       <Box display="flex" flexWrap="wrap" justifyContent="center" p={2}>
-        <Box display="flex" flexWrap="wrap" justifyContent="center">
+        <Box className={classes.formContainer}>
           <Box marginTop="1rem" padding="0 1rem">
             <Box className={classes.imageContainer}>
               {imageSrc ? (
@@ -346,7 +365,6 @@ export default function CreateHunt() {
             <Box>
               <form onSubmit={formik.handleSubmit}>
                 <TextField
-                  className={classes.formInput}
                   variant="outlined"
                   multiline
                   rows={4}
@@ -368,7 +386,6 @@ export default function CreateHunt() {
                 ></TextField>
 
                 <TextField
-                  className={classes.formInput}
                   variant="outlined"
                   fullWidth
                   margin="normal"
@@ -406,8 +423,6 @@ export default function CreateHunt() {
                 </Button>
 
                 <TextField
-                  className={classes.formInput}
-                  type="number"
                   variant="outlined"
                   fullWidth
                   margin="normal"
@@ -423,8 +438,6 @@ export default function CreateHunt() {
                 ></TextField>
 
                 <TextField
-                  className={classes.formInput}
-                  type="number"
                   variant="outlined"
                   fullWidth
                   margin="normal"
@@ -442,8 +455,6 @@ export default function CreateHunt() {
                 ></TextField>
 
                 <TextField
-                  className={classes.formInput}
-                  type="number"
                   variant="outlined"
                   fullWidth
                   margin="normal"

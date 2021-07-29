@@ -26,8 +26,20 @@ import { useState } from 'react';
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     title: { textAlign: 'center', margin: '0.75rem 0' },
+    formContainer: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      background: theme.palette.background.paper,
+      margin: '1rem 0',
+      padding: '1.5rem 2rem 2rem',
+      borderRadius: 4,
+      boxShadow: theme.shadows[2],
+      width: '100%',
+      maxWidth: 500,
+    },
     submitButton: {
-      marginTop: '2rem',
+      marginTop: '1.5rem',
     },
     toggleButtonGroup: {
       marginTop: '1rem',
@@ -63,10 +75,6 @@ const useStyles = makeStyles((theme: Theme) =>
       '&:hover': {
         backgroundColor: theme.palette.grey[200],
       },
-    },
-    formInput: {
-      background: theme.palette.background.paper,
-      borderRadius: 4,
     },
   })
 );
@@ -130,7 +138,7 @@ export default function CreateUser() {
       </Typography>
 
       <Box display="flex" justifyContent="center" padding="0 1rem" width="100%">
-        <Box width="40%" minWidth={300} maxWidth={500}>
+        <Box className={classes.formContainer}>
           <Formik
             initialValues={{
               userEmail: '',
@@ -168,7 +176,6 @@ export default function CreateUser() {
             {(props) => (
               <form onSubmit={props.handleSubmit}>
                 <TextField
-                  className={classes.formInput}
                   variant="outlined"
                   fullWidth
                   margin="normal"
@@ -188,9 +195,7 @@ export default function CreateUser() {
                   id="group"
                   name="group"
                   type="checkbox"
-                  className={
-                    classes.toggleButtonGroup + ' ' + classes.formInput
-                  }
+                  className={classes.toggleButtonGroup}
                   value={props.values.group}
                   exclusive
                   onChange={(e: any, group: string) => {

@@ -153,7 +153,7 @@ const Game = () => {
   const [treasureDistance, setTreasureDistance] = useState<number>();
   const [treasureDescription, setTreasureDescription] = useState<string>();
   const [open, setOpen] = React.useState(false);
-  const [isTreasureLoading, setIsTreasureLoading] = useState<boolean>(true);
+  const [isTreasureLoading, setIsTreasureLoading] = useState<boolean>(false);
   const [treasureImage, setTreasureImage] = useState<Object | string>();
 
   useEffect(() => {
@@ -179,11 +179,6 @@ const Game = () => {
   }, []);
 
   useEffect(() => {
-    // setTimeout(() => {
-    //   setIsWinner(true);
-    //   setTreasureDescription('This is treasure');
-    // }, 5000);
-
     if (isWinner) {
       getTreasureImage(huntID);
 

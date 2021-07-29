@@ -47,17 +47,17 @@ const useStyles = makeStyles((theme: Theme) =>
       },
     },
     zipCodeHeader: {
-      margin: '0 0 1rem',
+      margin: '0.5rem 0 1rem',
       textAlign: 'center',
     },
     zipCodeInput: {
       margin: '0 0 1rem',
     },
     zipCodeButton: {
-      marginBottom: '0.5rem',
+      marginBottom: '1rem',
     },
     signOutButton: {
-      marginTop: '1rem',
+      marginTop: '1.5rem',
     },
     closeIcon: {
       position: 'absolute',
@@ -187,19 +187,21 @@ const AuthButton = () => {
               </IconButton>
 
               <List className={classes.list}>
-                <ListItem>
-                  <ListItemIcon>
-                    <MailIcon />
-                  </ListItemIcon>
-                  <ListItemText primary={auth.user.attributes.email} />
-                </ListItem>
+                <Box margin="0 0 1rem">
+                  <ListItem>
+                    <ListItemIcon>
+                      <MailIcon />
+                    </ListItemIcon>
+                    <ListItemText primary={auth.user.attributes.email} />
+                  </ListItem>
 
-                <ListItem>
-                  <ListItemIcon>
-                    <GroupIcon />
-                  </ListItemIcon>
-                  <ListItemText primary={auth.userGroups?.toString()} />
-                </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <GroupIcon />
+                    </ListItemIcon>
+                    <ListItemText primary={auth.userGroups?.toString()} />
+                  </ListItem>
+                </Box>
 
                 <Divider />
 

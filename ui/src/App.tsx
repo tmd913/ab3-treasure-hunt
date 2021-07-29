@@ -47,7 +47,7 @@ const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     root: {
       width: '100%',
-      minHeight: '100vh',
+      minHeight: '100%',
       display: 'flex',
       flexDirection: 'column',
       flexGrow: 1,

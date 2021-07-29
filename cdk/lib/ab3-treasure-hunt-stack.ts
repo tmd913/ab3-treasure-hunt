@@ -19,6 +19,81 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
     super(scope, id, props);
 
     // ============================================================
+    // S3 Static Website Hosting
+    // ============================================================
+
+    const uiBucket = new s3.Bucket(this, 'uiBucket', {
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      lifecycleRules: [
+        { abortIncompleteMultipartUploadAfter: cdk.Duration.days(7) },
+        { noncurrentVersionExpiration: cdk.Duration.days(7) },
+      ],
+      blockPublicAccess: {
+        blockPublicAcls: true,
+        blockPublicPolicy: true,
+        ignorePublicAcls: true,
+        restrictPublicBuckets: true,
+      },
+      versioned: true,
+    });
+
+    new s3Deployment.BucketDeployment(this, 'uiBucketDeployment', {
+      sources: [
+        s3Deployment.Source.asset(path.join(__dirname, '../../ui/build')),
+      ],
+      destinationKeyPrefix: '/',
+      destinationBucket: uiBucket,
+    });
+
+    // ============================================================
+    // CloudFront to S3
+    // ============================================================
+
+    const cfOriginAccessIdentity = new cloudfront.OriginAccessIdentity(
+      this,
+      'cfOriginAccessIdentity',
+      {}
+    );
+
+    const cfS3Access = new iam.PolicyStatement();
+    cfS3Access.addActions('s3:GetBucket*');
+    cfS3Access.addActions('s3:GetObject*');
+    cfS3Access.addActions('s3:List*');
+    cfS3Access.addResources(uiBucket.bucketArn);
+    cfS3Access.addResources(`${uiBucket.bucketArn}/*`);
+    cfS3Access.addCanonicalUserPrincipal(
+      cfOriginAccessIdentity.cloudFrontOriginAccessIdentityS3CanonicalUserId
+    );
+    uiBucket.addToResourcePolicy(cfS3Access);
+
+    const distribution = new cloudfront.CloudFrontWebDistribution(
+      this,
+      'webDistribution',
+      {
+        originConfigs: [
+          {
+            s3OriginSource: {
+              s3BucketSource: uiBucket,
+              originAccessIdentity: cfOriginAccessIdentity,
+            },
+            behaviors: [
+              {
+                isDefaultBehavior: true,
+              },
+            ],
+          },
+        ],
+        errorConfigurations: [
+          {
+            errorCode: 404,
+            responseCode: 200,
+            responsePagePath: '/index.html',
+          },
+        ],
+      }
+    );
+
+    // ============================================================
     // Amazon Location Service
     // ============================================================
 
@@ -148,8 +223,14 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
           cognito.OAuthScope.PROFILE,
           cognito.OAuthScope.COGNITO_ADMIN,
         ],
-        callbackUrls: ['http://localhost:3000'],
-        logoutUrls: ['http://localhost:3000'],
+        callbackUrls: [
+          `https://${distribution.distributionDomainName}`,
+          'http://localhost:3000',
+        ],
+        logoutUrls: [
+          `https://${distribution.distributionDomainName}`,
+          'http://localhost:3000',
+        ],
       },
       generateSecret: false,
       refreshTokenValidity: Duration.days(30),
@@ -656,74 +737,6 @@ export class Ab3TreasureHuntStack extends cdk.Stack {
       new apigw.LambdaIntegration(searchPlaceIndexHandler),
       {
         authorizer,
-      }
-    );
-
-    // ============================================================
-    // S3 Static Website Hosting
-    // ============================================================
-
-    const uiBucket = new s3.Bucket(this, 'uiBucket', {
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      lifecycleRules: [
-        { abortIncompleteMultipartUploadAfter: cdk.Duration.days(7) },
-        { noncurrentVersionExpiration: cdk.Duration.days(7) },
-      ],
-      blockPublicAccess: {
-        blockPublicAcls: true,
-        blockPublicPolicy: true,
-        ignorePublicAcls: true,
-        restrictPublicBuckets: true,
-      },
-      versioned: true,
-    });
-
-    new s3Deployment.BucketDeployment(this, 'uiBucketDeployment', {
-      sources: [
-        s3Deployment.Source.asset(path.join(__dirname, '../../ui/build')),
-      ],
-      destinationKeyPrefix: '/',
-      destinationBucket: uiBucket,
-    });
-
-    // ============================================================
-    // CloudFront to S3
-    // ============================================================
-
-    const cfOriginAccessIdentity = new cloudfront.OriginAccessIdentity(
-      this,
-      'cfOriginAccessIdentity',
-      {}
-    );
-
-    const cfS3Access = new iam.PolicyStatement();
-    cfS3Access.addActions('s3:GetBucket*');
-    cfS3Access.addActions('s3:GetObject*');
-    cfS3Access.addActions('s3:List*');
-    cfS3Access.addResources(uiBucket.bucketArn);
-    cfS3Access.addResources(`${uiBucket.bucketArn}/*`);
-    cfS3Access.addCanonicalUserPrincipal(
-      cfOriginAccessIdentity.cloudFrontOriginAccessIdentityS3CanonicalUserId
-    );
-    uiBucket.addToResourcePolicy(cfS3Access);
-
-    const distribution = new cloudfront.CloudFrontWebDistribution(
-      this,
-      'webDistribution',
-      {
-        originConfigs: [
-          {
-            s3OriginSource: {
-              s3BucketSource: uiBucket,
-              originAccessIdentity: cfOriginAccessIdentity,
-            },
-            behaviors: [
-              {
-                isDefaultBehavior: true,
-              },
-            ],
-          },
-        ],
       }
     );
 
